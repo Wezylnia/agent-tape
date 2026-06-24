@@ -92,7 +92,7 @@ The solution is split by responsibility:
 - `src/AgentTape.Testing`: deterministic test output parsers
 - `src/AgentTape.Rules`: risk warning rules
 
-Read [docs/architecture.md](docs/architecture.md) and [docs/implementation-plan.md](docs/implementation-plan.md) before implementing features.
+Read [docs/architecture.md](docs/architecture.md) and [docs/roadmap.md](docs/roadmap.md) before implementing features.
 
 ## Roadmap
 

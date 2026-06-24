@@ -1,46 +1,49 @@
 # Next Model Brief
 
-Bu repo bir implementasyon iskeletidir. Amac rastgele yeni mimari kurmak degil, mevcut moduller uzerinden v0.1'i tamamlamaktir.
+This repository is an implementation skeleton. Do not invent a new architecture. Continue from the existing module boundaries and finish v0.1 in small, verifiable steps.
 
-## Once Oku
+## Read First
 
-1. `docs/architecture.md`
-2. `docs/implementation-plan.md`
-3. `README.md`
-4. `private-docs/project-idea.md`
+1. `README.md`
+2. `docs/architecture.md`
+3. `docs/roadmap.md`
 
-## Mevcut Teknik Kararlar
+Follow-up implementation should stay within the public architecture and roadmap unless a maintainer provides more specific private planning notes.
+
+## Current Technical Decisions
 
 - Target framework: `net10.0`
-- SDK pin: `global.json` ile `10.0.301`
+- SDK pin: `global.json`
 - Solution file: `AgentTape.slnx`
-- Core bagimsiz domain/port katmani
-- Git adapter: git CLI
-- Redaction: regex tabanli, local-only
-- Reporting: static Markdown/HTML
-- Test parser: once dotnet text output
+- Core is the domain and port layer
+- Git adapter uses the `git` CLI
+- Redaction is regex-based and local-only
+- Reporting is static Markdown and HTML
+- Test parsing starts with dotnet text output
 
-## Ilk Yapilacak Is
+## First Implementation Target
 
-`docs/implementation-plan.md` icindeki Faz 0'i yesil hale getir:
+Finish the v0.1 session storage flow before adding new feature areas:
+
+- `FileSystemSessionStore`
+- `SessionIdFactory`
+- strict session layout tests
+- CLI integration that writes through the store instead of direct ad hoc file writes
+
+Required checks:
 
 ```bash
 dotnet build AgentTape.slnx
 dotnet test AgentTape.slnx
+dotnet run --project src/AgentTape.Cli/AgentTape.Cli.csproj -- --help
 ```
 
-Sonra Faz 1'e gec:
+## Guardrails
 
-- `FileSystemSessionStore`
-- `SessionIdFactory`
-- layout testleri
-- CLI dosya yazimini store'a tasima
-
-## Yasaklar
-
-- Core'a HTML, git veya redaction detayi koyma
-- Redaction'i default kapatma
-- LLM entegrasyonu ekleme
-- Replay execute ekleme
-- Web dashboard baslatma
-- Yeni frontend app kurma
+- Do not put HTML, git, redaction, test parsing, or rule logic into Core.
+- Do not disable redaction by default.
+- Do not add LLM calls.
+- Do not add cloud upload.
+- Do not add real replay execution.
+- Do not start a web dashboard.
+- Do not commit files under `private-docs/`.

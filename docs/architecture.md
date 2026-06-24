@@ -1,59 +1,90 @@
-# AgentTape Mimari Tasarimi
+# AgentTape Architecture
 
-Bu dokuman AgentTape'in moduler mimarisini tarif eder. Implementasyon yapacak model once bu dosyayi, sonra `docs/implementation-plan.md` dosyasini okumalidir.
+This document defines the public architecture for AgentTape. It is intentionally high-level and stable. The detailed task-by-task implementation plan is private project planning material and is kept outside the public documentation.
 
-## Urun Siniri
+## Product Boundary
 
-AgentTape bir AI agent degildir. Kod yazmaz, refactor onermez, sandbox uygulamaz, terminal videosu kaydetmez ve varsayilan olarak hicbir veriyi dis API'ye gondermez.
+AgentTape is a local-first flight recorder for AI coding agent and terminal-based development sessions.
 
-AgentTape'in isi:
+AgentTape does:
 
-- Komut oturumunu kaydetmek
-- Git durumunu ve final diff'i yakalamak
-- Stdout/stderr ciktilarini redaction ile guvenli hale getirmek
-- Test sinyallerini deterministik olarak cikarmak
-- Risk uyarilari uretmek
-- HTML ve Markdown rapor olusturmak
+- record command execution metadata,
+- capture redacted stdout and stderr,
+- capture git status and final diffs,
+- extract deterministic test signals,
+- produce risk warnings from explicit rules,
+- generate local HTML and Markdown reports,
+- package session evidence in a reviewable format.
 
-## Katmanlar
+AgentTape does not:
+
+- write code as an AI agent,
+- make autonomous repair decisions,
+- call an LLM by default,
+- upload sessions to a cloud service,
+- claim to sandbox commands,
+- record every terminal keystroke,
+- replay commands by default,
+- act as a full SAST, malware scanner, or compliance tool.
+
+The core value is a trustworthy developer timeline, not a terminal video.
+
+## Solution Layout
+
+```text
+src/
+  AgentTape.Cli/
+  AgentTape.Core/
+  AgentTape.Git/
+  AgentTape.Redaction/
+  AgentTape.Reporting/
+  AgentTape.Testing/
+  AgentTape.Rules/
+
+tests/
+  AgentTape.Core.Tests/
+  AgentTape.Redaction.Tests/
+  AgentTape.Reporting.Tests/
+```
+
+## Module Responsibilities
 
 ### AgentTape.Cli
 
-Sadece komut satiri giris noktasi ve orkestrasyon katmanidir.
+The CLI is the entry point and orchestration layer.
 
-Sorumluluklari:
+Responsibilities:
 
-- `agenttape init`
-- `agenttape record -- <command>`
-- `agenttape report`
-- `agenttape export`
-- `agenttape pack`
-- CLI argumanlarini parse etmek
-- Core portlarini somut adapter'lara baglamak
-- Kullaniciya kisa ozet yazmak
+- parse command-line arguments,
+- dispatch commands such as `init`, `record`, `report`, `export`, and later `pack`,
+- compose concrete implementations from the other modules,
+- control process exit codes,
+- print short human-readable summaries.
 
-Yapmamasi gerekenler:
+The CLI must not contain:
 
-- Redaction regex'i yazmak
-- Git status parse etmek
-- HTML template icermek
-- Test framework parse etmek
-- Risk kurali mantigi tasimak
+- secret detection regexes,
+- git porcelain parsing,
+- HTML templates,
+- test output parsing rules,
+- risk rule logic.
 
 ### AgentTape.Core
 
-Domain model ve port katmanidir. Diger moduller Core'a baglanabilir; Core baska AgentTape modulune baglanmamalidir.
+Core contains domain models, options, and abstraction contracts. It is the dependency root for the rest of the solution.
 
-Icerik:
+Core contains:
 
 - `TapeSession`
 - `CommandRun`
+- `CommandRequest`
+- `CommandResult`
 - `GitSnapshot`
 - `FileChange`
 - `RiskWarning`
 - `TestSummary`
-- `CommandRequest`
-- `CommandResult`
+- `EnvironmentSnapshot`
+- `SessionPaths`
 - `ICommandRunner`
 - `IGitSnapshotProvider`
 - `IRedactor`
@@ -62,123 +93,133 @@ Icerik:
 - `IRiskRule`
 - `ISessionStore`
 
-Kural: Core icinde IO minimumda tutulmali. Process calistirma gibi ortak ve kucuk altyapi kabul edilebilir, fakat rapor, git, parser ve redaction mantigi Core'a girmemeli.
+Core must not depend on any other AgentTape module.
 
 ### AgentTape.Git
 
-Git CLI uzerinden snapshot ve diff alir.
+Git integration captures repository state using the `git` CLI. This keeps the first implementation simple, portable, and free from native library dependencies.
 
-MVP'de libgit2 veya baska native bagimlilik kullanilmayacak. Git zaten developer makinesinde beklenen bir arac oldugu icin ilk surumde `git` CLI cagrilari yeterlidir.
+Responsibilities:
 
-Sorumluluklari:
+- detect whether the working directory is inside a git repository,
+- capture branch and HEAD SHA,
+- capture `git status --porcelain=v1`,
+- convert status output into `FileChange` values,
+- capture final diffs,
+- tolerate non-git directories.
 
-- Repo icinde miyiz kontrolu
-- Branch adini alma
-- HEAD SHA alma
-- `git status --porcelain=v1` alma ve `FileChange` listesine cevirme
-- `git diff --no-ext-diff` alma
-- Git yoksa veya repo degilse graceful fallback
-
-Hata davranisi:
-
-- Repo degilse hata firlatma; `GitSnapshot { IsRepository = false }` don
-- Git komutu beklenmedik sekilde patlarsa record akisini tamamen durdurma karari CLI seviyesinde verilmelidir
+Non-git directories are valid. A command recording session must not fail just because the working directory is not a git repository.
 
 ### AgentTape.Redaction
 
-Cikti ve rapora girecek metinleri maskeleyen lokal-only moduldur.
+Redaction protects reports, exported summaries, and session bundles from common accidental secret exposure.
 
-Modlar:
+Modes:
 
-- `Off`: hicbir sey maskelemez. Varsayilan olamaz.
-- `Standard`: token, password, connection string, JWT, local user path maskeler. Varsayilan budur.
-- `Strict`: Standard'a ek olarak email ve ileride IP/domain gibi kimlik bilgilerini de maskeler.
+- `Off`: no masking. Must never be the default.
+- `Standard`: masks common tokens, passwords, JWTs, connection string secrets, and local user paths. This is the default.
+- `Strict`: includes `Standard` behavior plus additional identity-oriented masking such as email addresses.
 
-MVP'de regex tabanli olmalidir. Scanner/SAST aracina donusturulmemelidir.
+Redaction is local-only and rule-based in v0.1. It must not call an external service.
 
 ### AgentTape.Reporting
 
-Statik rapor uretir.
+Reporting turns a `TapeSession` into local artifacts.
 
-MVP formatlari:
+MVP report formats:
 
-- Markdown: PR/issue summary icin
-- HTML: lokal paylasilabilir rapor icin
+- Markdown for pull request and issue summaries,
+- static HTML for shareable local reports.
 
-Kurallar:
-
-- Rapor raw secret gostermemeli
-- HTML tek dosya olarak acilabilmeli
-- Server gerektirmemeli
-- LLM summary icermemeli
+Reporting must always HTML-encode untrusted content and must consume redacted data.
 
 ### AgentTape.Testing
 
-Test ciktilarindan deterministik sinyal cikarir.
+Testing parsers extract deterministic test signals from command output or imported test files.
 
-MVP:
+MVP scope:
 
-- Basit `dotnet test` text output parse
+- basic `dotnet test` text output detection.
 
-v0.2:
+Later scope:
 
-- TRX parser
-- xUnit XML parser
-- NUnit XML parser
+- TRX,
+- xUnit XML,
+- NUnit XML,
+- JUnit XML.
 
-Bu modul test runner calistirmamalidir. Sadece mevcut command output veya import edilen dosyayi parse etmelidir.
+This module parses evidence. It must not run test commands itself.
 
 ### AgentTape.Rules
 
-Risk uyarilarini uretir.
+Rules produce risk warnings from captured command, git, and test evidence.
 
-Ilk kurallar:
+Initial warning families:
 
-- `CONFIG_CHANGED`
-- `SECRET_FILE_TOUCHED`
-- `LARGE_DELETE`
-- `BINARY_CHANGED`
-- `LOCKFILE_CHANGED`
-- `MIGRATION_CHANGED`
-- `BUILD_FAILED`
-- `TEST_FAILED`
-- `SUSPICIOUS_COMMAND`
-- `NETWORK_SCRIPT_EXEC`
+- config files changed,
+- secret-looking files touched,
+- suspicious command patterns,
+- failed test commands,
+- failed build commands,
+- lockfiles changed,
+- migrations changed,
+- binary files changed,
+- large deletes.
 
-Kural motoru basit kalmalidir. Ilk versiyonda reflection, plugin engine veya DSL gerekmiyor.
+Rules should be deterministic and explainable. Do not add an opaque scoring engine in the MVP.
 
-## Bagimlilik Yonu
+## Dependency Direction
 
-Dogru bagimlilik yonu:
+Allowed dependencies:
 
 ```text
-AgentTape.Cli
-  -> AgentTape.Core
-  -> AgentTape.Git
-  -> AgentTape.Redaction
-  -> AgentTape.Reporting
-  -> AgentTape.Testing
-  -> AgentTape.Rules
-
+AgentTape.Cli       -> all implementation modules
 AgentTape.Git       -> AgentTape.Core
+AgentTape.Redaction -> AgentTape.Core
 AgentTape.Reporting -> AgentTape.Core
 AgentTape.Testing   -> AgentTape.Core
 AgentTape.Rules     -> AgentTape.Core
-AgentTape.Redaction -> AgentTape.Core
 AgentTape.Core      -> no AgentTape module dependency
 ```
 
-Yanlis bagimlilik ornekleri:
+Forbidden dependencies:
 
-- `Core -> Reporting`
-- `Core -> Git`
-- `Redaction -> Reporting`
-- `Rules -> Git`
-- `Testing -> Cli`
+- `AgentTape.Core -> AgentTape.Reporting`
+- `AgentTape.Core -> AgentTape.Git`
+- `AgentTape.Core -> AgentTape.Redaction`
+- `AgentTape.Redaction -> AgentTape.Reporting`
+- `AgentTape.Rules -> AgentTape.Git`
+- `AgentTape.Testing -> AgentTape.Cli`
 
-## Session Dosya Yapisi
+## Recording Flow
 
-Hedef layout:
+The target `record` flow is:
+
+1. Parse CLI arguments.
+2. Load configuration or default options.
+3. Create a session id and session directory.
+4. Capture git state before command execution.
+5. Run the requested command.
+6. Capture stdout, stderr, exit code, start time, finish time, and duration.
+7. Apply redaction before writing report-facing output.
+8. Capture git state after command execution.
+9. Capture final diff.
+10. Run test detectors.
+11. Run risk rules.
+12. Save structured session files.
+13. Generate Markdown and HTML reports.
+14. Print a concise console summary.
+15. Return the wrapped command exit code.
+
+## Exit Code Rule
+
+`agenttape record -- <command>` must return the wrapped command's exit code.
+
+If `dotnet test` exits with `1`, AgentTape must also exit with `1`. AgentTape-specific failures should use separate usage or internal error codes.
+
+## Session Layout
+
+Target v0.1 layout:
 
 ```text
 .agenttape/
@@ -201,60 +242,33 @@ Hedef layout:
     session.md
 ```
 
-MVP'de basit dosya yazimi kabul edilebilir, fakat v0.1 kapanmadan `ISessionStore` uzerinden bu layout standart hale getirilmelidir.
+The layout should stay easy to inspect manually. Avoid opaque binary session formats until the plain layout is stable.
 
-## Ana Akis: record
+## Security Defaults
 
-`agenttape record -- dotnet test` akisi:
+- Redaction defaults to `standard`.
+- Raw output must not be shown in reports by default.
+- Export and pack flows must prefer redacted data.
+- Prompt capture, if added later, must be opt-in.
+- Replay must start as dry-run only.
+- AgentTape must remain useful without an LLM.
 
-1. CLI argumanlari parse eder.
-2. Config okunur veya default options kullanilir.
-3. Session id ve session klasoru olusturulur.
-4. Git before snapshot alinir.
-5. Komut calistirilir.
-6. Stdout/stderr yakalanir.
-7. Redaction uygulanir.
-8. Redacted output dosyalara yazilir.
-9. Git after snapshot alinir.
-10. Git diff yakalanir.
-11. Test detector output uzerinde calisir.
-12. Risk rules session uzerinde calisir.
-13. `session.json` ve `commands.jsonl` yazilir.
-14. Markdown ve HTML rapor uretilir.
-15. Konsola kisa ozet yazilir.
-16. CLI exit code olarak calistirilan komutun exit code'u donulur.
+## Acceptable MVP Shortcuts
 
-## Cikis Kodu Kurali
+These are acceptable in v0.1:
 
-`record` komutu, kaydedilen komutun exit code'unu dondurmelidir. Bu davranis CI ve script uyumlulugu icin onemlidir.
+- simple hand-written CLI parsing,
+- direct constructor wiring instead of a dependency injection container,
+- git CLI instead of libgit2,
+- string-based HTML generation if all dynamic content is encoded,
+- basic regex-based redaction,
+- limited dotnet test text parsing.
 
-Ornek:
+These are not acceptable:
 
-- `agenttape record -- dotnet test` icindeki `dotnet test` exit code `1` ise AgentTape de `1` donmeli
-- AgentTape kendi ic hatasi yuzunden basarisiz olduysa farkli hata kodu kullanilmali
-
-## Guvenlik Varsayimlari
-
-- Raw output varsayilan rapora girmemeli
-- `redaction.mode = standard` varsayilan olmali
-- `redaction.mode = off` kullanici tarafindan acikca secilmeli
-- Pack/export varsayilan olarak redacted veri kullanmali
-- Replay varsayilan olarak sadece dry-run olmali
-
-## MVP Icin Kabul Edilebilir Kisaltmalar
-
-Bu kisaltmalar v0.1 iskeletinde kabul edilebilir:
-
-- Dependency injection framework kullanmadan elle wiring
-- System.CommandLine yerine basit parser
-- HTML icin basit string template
-- Git icin sadece porcelain v1 parser
-- Test parse icin sadece dotnet text summary
-
-Bu kisaltmalar kabul edilmez:
-
-- Redaction'i atlamak
-- Core'a rapor/gir/git parser mantigi koymak
-- Raw secret'i rapora yazmak
-- Full replay execute yapmak
-- Cloud veya account sistemi eklemek
+- skipping redaction,
+- putting implementation logic into Core,
+- writing raw secrets into generated reports,
+- adding cloud upload,
+- adding default LLM calls,
+- adding real command replay execution.

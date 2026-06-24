@@ -22,8 +22,8 @@ dotnet test AgentTape.slnx
 Read these files first:
 
 - `docs/architecture.md`
-- `docs/implementation-plan.md`
 - `docs/next-model-brief.md`
+- `docs/roadmap.md`
 
 ## Pull Request Expectations
 
