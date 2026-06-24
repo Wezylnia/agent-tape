@@ -52,4 +52,7 @@ public sealed record CliParseResult
 
     /// <summary>Output file path for export.</summary>
     public string? Output { get; init; }
+
+    /// <summary>Shell command string for record --shell.</summary>
+    public string? Shell { get; init; }
 }

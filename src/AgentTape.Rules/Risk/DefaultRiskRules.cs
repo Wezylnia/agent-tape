@@ -137,7 +137,12 @@ public sealed class DefaultRiskRules : IRiskRule
             // Suspicious commands (destructive/file-manipulation)
             if (normalized.Contains("rm -rf", StringComparison.Ordinal) ||
                 normalized.Contains("del /s", StringComparison.Ordinal) ||
-                normalized.Contains("invoke-expression", StringComparison.Ordinal))
+                normalized.Contains("rmdir /s", StringComparison.Ordinal) ||
+                normalized.Contains("format ", StringComparison.Ordinal) ||
+                normalized.Contains("invoke-expression", StringComparison.Ordinal) ||
+                normalized.Contains("iex", StringComparison.Ordinal) ||
+                normalized.Contains("git clean -fd", StringComparison.Ordinal) ||
+                normalized.Contains("shutdown", StringComparison.Ordinal))
             {
                 warnings.Add(new RiskWarning
                 {

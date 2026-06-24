@@ -100,13 +100,73 @@ public static class CliParser
     private static CliParseResult ParseRecord(string[] args)
     {
         var separatorIndex = Array.IndexOf(args, "--");
-        if (separatorIndex < 1)
+        var shellIndex = Array.IndexOf(args, "--shell");
+        var hasShell = shellIndex >= 0;
+
+        if (!hasShell && separatorIndex < 1)
         {
             return new CliParseResult
             {
                 IsSuccess = false,
-                ErrorMessage = "Usage: agenttape record [--name <name>] [--redact standard|strict|off] [--no-git] -- <command> [args]"
+                ErrorMessage = "Usage: agenttape record [--name <name>] [--redact standard|strict|off] [--no-git] [--shell <command>] -- <command> [args]"
             };
+        }
+
+        if (hasShell && separatorIndex >= 0)
+        {
+            return new CliParseResult
+            {
+                IsSuccess = false,
+                ErrorMessage = "--shell cannot be combined with -- <command>."
+            };
+        }
+
+        // Handle --shell mode
+        if (hasShell)
+        {
+            if (shellIndex + 1 >= args.Length)
+            {
+                return new CliParseResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "--shell requires a command string."
+                };
+            }
+
+            var shellCommand = args[shellIndex + 1];
+
+            string executable;
+            string[] shellArgs;
+
+            if (OperatingSystem.IsWindows())
+            {
+                executable = "cmd";
+                shellArgs = ["/c", shellCommand];
+            }
+            else
+            {
+                executable = "/bin/sh";
+                shellArgs = ["-lc", shellCommand];
+            }
+
+            var shellResult = new CliParseResult
+            {
+                IsSuccess = true,
+                Command = "record",
+                Shell = shellCommand,
+                WrappedExecutable = executable,
+                WrappedArguments = shellArgs
+            };
+
+            // Parse options before --shell
+            for (var i = 1; i < shellIndex; i++)
+            {
+                var optResult = ParseRecordOption(shellResult, args, ref i);
+                if (!optResult.IsSuccess) return optResult;
+                shellResult = optResult;
+            }
+
+            return shellResult;
         }
 
         var optionArgs = args[1..separatorIndex];
@@ -131,55 +191,64 @@ public static class CliParser
 
         for (var i = 0; i < optionArgs.Length; i++)
         {
-            switch (optionArgs[i].ToLowerInvariant())
-            {
-                case "--name":
-                    if (i + 1 >= optionArgs.Length || optionArgs[i + 1].StartsWith("--"))
-                    {
-                        return new CliParseResult
-                        {
-                            IsSuccess = false,
-                            ErrorMessage = "--name requires a value."
-                        };
-                    }
+            var optResult = ParseRecordOption(result, optionArgs, ref i);
+            if (!optResult.IsSuccess) return optResult;
+            result = optResult;
+        }
 
-                    result = result with { Name = optionArgs[++i] };
-                    break;
+        return result;
+    }
 
-                case "--redact":
-                    if (i + 1 >= optionArgs.Length || optionArgs[i + 1].StartsWith("--"))
-                    {
-                        return new CliParseResult
-                        {
-                            IsSuccess = false,
-                            ErrorMessage = "--redact requires a value (standard, strict, or off)."
-                        };
-                    }
-
-                    var redactValue = optionArgs[++i];
-                    if (!ValidRedactValues.Contains(redactValue))
-                    {
-                        return new CliParseResult
-                        {
-                            IsSuccess = false,
-                            ErrorMessage = $"Invalid redaction mode: {redactValue}. Use: standard, strict, or off."
-                        };
-                    }
-
-                    result = result with { Redact = redactValue.ToLowerInvariant() };
-                    break;
-
-                case "--no-git":
-                    result = result with { NoGit = true };
-                    break;
-
-                default:
+    private static CliParseResult ParseRecordOption(CliParseResult result, string[] args, ref int i)
+    {
+        switch (args[i].ToLowerInvariant())
+        {
+            case "--name":
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                {
                     return new CliParseResult
                     {
                         IsSuccess = false,
-                        ErrorMessage = $"Unknown option: {optionArgs[i]}"
+                        ErrorMessage = "--name requires a value."
                     };
-            }
+                }
+
+                result = result with { Name = args[++i] };
+                break;
+
+            case "--redact":
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                {
+                    return new CliParseResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "--redact requires a value (standard, strict, or off)."
+                    };
+                }
+
+                var redactValue = args[++i];
+                if (!ValidRedactValues.Contains(redactValue))
+                {
+                    return new CliParseResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = $"Invalid redaction mode: {redactValue}. Use: standard, strict, or off."
+                    };
+                }
+
+                result = result with { Redact = redactValue.ToLowerInvariant() };
+                break;
+
+            case "--no-git":
+                result = result with { NoGit = true };
+                break;
+
+            default:
+                return new CliParseResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = $"Unknown option: {args[i]}"
+                };
         }
 
         return result;
