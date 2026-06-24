@@ -17,8 +17,8 @@ public sealed record CliParseResult
     /// <summary>Session name for the record command.</summary>
     public string? Name { get; init; }
 
-    /// <summary>Redaction mode for the record command.</summary>
-    public string Redact { get; init; } = "standard";
+    /// <summary>Redaction mode for the record command. Null when not explicitly set by user.</summary>
+    public string? Redact { get; init; }
 
     /// <summary>When true, git capture is skipped.</summary>
     public bool NoGit { get; init; }
@@ -40,4 +40,16 @@ public sealed record CliParseResult
 
     /// <summary>Export format (markdown, json).</summary>
     public string? Format { get; init; }
+
+    /// <summary>Explicit config file path. Null when not specified.</summary>
+    public string? ConfigPath { get; init; }
+
+    /// <summary>Session ID for show, report --session, and export --session.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>Export as GitHub PR summary.</summary>
+    public bool GitHubPr { get; init; }
+
+    /// <summary>Output file path for export.</summary>
+    public string? Output { get; init; }
 }

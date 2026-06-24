@@ -13,7 +13,7 @@ public static class CliParser
 
     private static readonly HashSet<string> ValidExportFormats = new(StringComparer.OrdinalIgnoreCase)
     {
-        "markdown", "json"
+        "markdown", "json", "html"
     };
 
     /// <summary>
@@ -30,20 +30,57 @@ public static class CliParser
             };
         }
 
-        var command = args[0].ToLowerInvariant();
-
-        return command switch
+        // Extract global --config option before command dispatch
+        string? configPath = null;
+        var remainingArgs = new List<string>();
+        for (var i = 0; i < args.Length; i++)
         {
-            "init" => ParseInit(args),
-            "record" => ParseRecord(args),
-            "report" => ParseReport(args),
-            "export" => ParseExport(args),
+            if (args[i].Equals("--config", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                {
+                    return new CliParseResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "--config requires a value."
+                    };
+                }
+                configPath = args[++i];
+            }
+            else
+            {
+                remainingArgs.Add(args[i]);
+            }
+        }
+
+        var remainingArray = remainingArgs.ToArray();
+        if (remainingArray.Length == 0)
+        {
+            return new CliParseResult
+            {
+                IsSuccess = false,
+                ErrorMessage = "No command specified. Use: init, record, report, or export."
+            };
+        }
+
+        var command = remainingArray[0].ToLowerInvariant();
+
+        var commandResult = command switch
+        {
+            "init" => ParseInit(remainingArray),
+            "record" => ParseRecord(remainingArray),
+            "report" => ParseReport(remainingArray),
+            "export" => ParseExport(remainingArray),
+            "list" => new CliParseResult { IsSuccess = true, Command = "list" },
+            "show" => ParseShow(remainingArray),
             _ => new CliParseResult
             {
                 IsSuccess = false,
-                ErrorMessage = $"Unknown command: {args[0]}. Use: init, record, report, or export."
+                ErrorMessage = $"Unknown command: {remainingArray[0]}. Use: init, record, report, or export."
             }
         };
+
+        return commandResult with { ConfigPath = configPath };
     }
 
     private static CliParseResult ParseInit(string[] args)
@@ -88,7 +125,6 @@ public static class CliParser
         {
             IsSuccess = true,
             Command = "record",
-            Redact = "standard",
             WrappedExecutable = commandArgs[0],
             WrappedArguments = commandArgs.Skip(1).ToArray()
         };
@@ -166,6 +202,17 @@ public static class CliParser
                 case "--open":
                     result = result with { Open = true };
                     break;
+                case "--session":
+                    if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                    {
+                        return new CliParseResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = "--session requires a value."
+                        };
+                    }
+                    result = result with { SessionId = args[++i] };
+                    break;
                 default:
                     return new CliParseResult
                     {
@@ -180,44 +227,107 @@ public static class CliParser
 
     private static CliParseResult ParseExport(string[] args)
     {
-        if (args.Length < 2 || args[1].ToLowerInvariant() != "--format")
+        var result = new CliParseResult { IsSuccess = true, Command = "export" };
+        var formatSet = false;
+
+        for (var i = 1; i < args.Length; i++)
+        {
+            switch (args[i].ToLowerInvariant())
+            {
+                case "--format":
+                    if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                    {
+                        return new CliParseResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = "--format requires a value (markdown, json, or html)."
+                        };
+                    }
+
+                    var format = args[++i].ToLowerInvariant();
+                    if (!ValidExportFormats.Contains(format))
+                    {
+                        return new CliParseResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = $"Invalid export format: {format}. Use: markdown, json, or html."
+                        };
+                    }
+
+                    result = result with { Format = format };
+                    formatSet = true;
+                    break;
+
+                case "--github-pr":
+                    result = result with { GitHubPr = true, Format = "github-pr" };
+                    formatSet = true;
+                    break;
+
+                case "--output":
+                    if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                    {
+                        return new CliParseResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = "--output requires a value."
+                        };
+                    }
+                    result = result with { Output = args[++i] };
+                    break;
+
+                case "--session":
+                    if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                    {
+                        return new CliParseResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = "--session requires a value."
+                        };
+                    }
+                    result = result with { SessionId = args[++i] };
+                    break;
+
+                default:
+                    return new CliParseResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = $"Unknown option: {args[i]}"
+                    };
+            }
+        }
+
+        if (!formatSet)
         {
             return new CliParseResult
             {
                 IsSuccess = false,
-                ErrorMessage = "export requires --format markdown|json"
+                ErrorMessage = "export requires --format markdown|json|html or --github-pr"
             };
         }
 
-        if (args.Length < 3)
+        return result;
+    }
+
+    private static CliParseResult ParseShow(string[] args)
+    {
+        if (args.Length < 2)
         {
             return new CliParseResult
             {
                 IsSuccess = false,
-                ErrorMessage = "--format requires a value (markdown or json)."
+                ErrorMessage = "Usage: agenttape show <session-id>"
             };
         }
 
-        var format = args[2].ToLowerInvariant();
-        if (!ValidExportFormats.Contains(format))
+        if (args.Length > 2)
         {
             return new CliParseResult
             {
                 IsSuccess = false,
-                ErrorMessage = $"Invalid export format: {format}. Use: markdown or json."
+                ErrorMessage = $"Unknown option: {args[2]}"
             };
         }
 
-        // Check for unknown trailing args
-        if (args.Length > 3)
-        {
-            return new CliParseResult
-            {
-                IsSuccess = false,
-                ErrorMessage = $"Unknown option: {args[3]}"
-            };
-        }
-
-        return new CliParseResult { IsSuccess = true, Command = "export", Format = format };
+        return new CliParseResult { IsSuccess = true, Command = "show", SessionId = args[1] };
     }
 }

@@ -49,14 +49,18 @@ public sealed class RecordCommand
     public async Task<int> ExecuteAsync(CliParseResult parseResult, CancellationToken cancellationToken)
     {
         var workingDirectory = Directory.GetCurrentDirectory();
-        var redactionMode = ParseRedactionMode(parseResult.Redact);
+        var redactionMode = parseResult.Redact is not null
+            ? ParseRedactionMode(parseResult.Redact)
+            : _options.RedactionMode;
         var sessionName = parseResult.Name ?? parseResult.WrappedExecutable ?? "record";
 
         var startedAt = _clock.UtcNow;
         var sessionId = SessionIdFactory.Create(sessionName, startedAt);
 
+        var skipGit = parseResult.NoGit || !_options.CaptureGit;
+
         GitSnapshot beforeGit;
-        if (parseResult.NoGit)
+        if (skipGit)
         {
             beforeGit = new GitSnapshot { IsRepository = false };
         }
@@ -90,7 +94,7 @@ public sealed class RecordCommand
 
         GitSnapshot afterGit;
         string diff;
-        if (parseResult.NoGit)
+        if (skipGit)
         {
             afterGit = new GitSnapshot { IsRepository = false };
             diff = string.Empty;
@@ -115,16 +119,20 @@ public sealed class RecordCommand
             RedactedStderrPreview = _redactor.Redact(result.Stderr, redactionMode)
         };
 
+        // Redact git diff and working directory
+        var redactedDiff = _redactor.Redact(diff, redactionMode);
+        var redactedWorkingDirectory = _redactor.Redact(workingDirectory, redactionMode);
+
         var session = new TapeSession
         {
             Id = sessionId,
             Name = sessionName,
             StartedAt = startedAt,
             FinishedAt = _clock.UtcNow,
-            WorkingDirectory = workingDirectory,
+            WorkingDirectory = redactedWorkingDirectory,
             RedactionMode = redactionMode,
             BeforeGit = beforeGit,
-            AfterGit = afterGit with { StatusText = diff },
+            AfterGit = afterGit with { StatusText = redactedDiff },
             Commands = [command],
             FileChanges = afterGit.Changes,
             TestSummaries = [_testDetector.Detect(command.Command, result.Stdout, result.Stderr)]
@@ -132,20 +140,34 @@ public sealed class RecordCommand
 
         session = session with { Warnings = _riskRule.Evaluate(session) };
 
+        // Build redaction summaries
+        var stdoutResult = _redactor.RedactWithSummary(result.Stdout, redactionMode);
+        var stderrResult = _redactor.RedactWithSummary(result.Stderr, redactionMode);
+        var diffResult = _redactor.RedactWithSummary(diff, redactionMode);
+        var wdResult = _redactor.RedactWithSummary(workingDirectory, redactionMode);
+
+        var allSummaries = MergeSummaries(stdoutResult, stderrResult, diffResult, wdResult);
+
         // Store session and generate reports
         var paths = await _sessionStore.CreateSessionLayoutAsync(session, cancellationToken);
         await _sessionStore.SaveSessionAsync(session, paths, cancellationToken);
 
-        var markdownPath = Path.Combine(paths.ReportsDirectory, "session.md");
-        var htmlPath = Path.Combine(paths.ReportsDirectory, "session.html");
+        // Write redaction log
+        await _sessionStore.SaveRedactionLogAsync(paths, allSummaries, cancellationToken);
 
-        await File.WriteAllTextAsync(markdownPath,
-            await _markdownGenerator.GenerateAsync(session, cancellationToken), cancellationToken);
-        await File.WriteAllTextAsync(htmlPath,
-            await _htmlGenerator.GenerateAsync(session, cancellationToken), cancellationToken);
+        // Write session-specific reports
+        var markdownContent = await _markdownGenerator.GenerateAsync(session, cancellationToken);
+        var htmlContent = await _htmlGenerator.GenerateAsync(session, cancellationToken);
+
+        await File.WriteAllTextAsync(paths.SessionMarkdownReportPath, markdownContent, cancellationToken);
+        await File.WriteAllTextAsync(paths.SessionHtmlReportPath, htmlContent, cancellationToken);
+
+        // Update latest aliases
+        await File.WriteAllTextAsync(paths.LatestMarkdownReportPath, markdownContent, cancellationToken);
+        await File.WriteAllTextAsync(paths.LatestHtmlReportPath, htmlContent, cancellationToken);
 
         Console.WriteLine($"Captured 1 command, {session.FileChanges.Count} changed files, {session.Warnings.Count} warnings.");
-        Console.WriteLine($"Reports: {htmlPath} and {markdownPath}");
+        Console.WriteLine($"Reports: {paths.SessionHtmlReportPath} and {paths.SessionMarkdownReportPath}");
 
         return command.ExitCode;
     }
@@ -158,5 +180,15 @@ public sealed class RecordCommand
             "strict" => RedactionMode.Strict,
             _ => RedactionMode.Standard
         };
+    }
+
+    private static IReadOnlyList<RedactionMatchSummary> MergeSummaries(params RedactionResult[] results)
+    {
+        return results
+            .SelectMany(r => r.Summaries)
+            .GroupBy(s => s.RuleName)
+            .Select(g => new RedactionMatchSummary { RuleName = g.Key, Count = g.Sum(s => s.Count) })
+            .OrderByDescending(s => s.Count)
+            .ToArray();
     }
 }

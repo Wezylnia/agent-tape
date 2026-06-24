@@ -62,11 +62,11 @@ public sealed class CliParserTests
     }
 
     [Fact]
-    public void Parse_record_defaults_to_standard_redaction()
+    public void Parse_record_does_not_default_redaction()
     {
         var result = CliParser.Parse(["record", "--", "dotnet"]);
         Assert.True(result.IsSuccess);
-        Assert.Equal("standard", result.Redact);
+        Assert.Null(result.Redact);
     }
 
     [Fact]
@@ -182,5 +182,48 @@ public sealed class CliParserTests
         Assert.Equal("strict", result.Redact);
         Assert.Equal("dotnet", result.WrappedExecutable);
         Assert.Contains("test", result.WrappedArguments);
+    }
+
+    [Fact]
+    public void Parse_accepts_global_config_option_for_record()
+    {
+        var result = CliParser.Parse(["--config", "custom.yml", "record", "--", "dotnet"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("custom.yml", result.ConfigPath);
+        Assert.Equal("record", result.Command);
+    }
+
+    [Fact]
+    public void Parse_accepts_global_config_option_for_report()
+    {
+        var result = CliParser.Parse(["--config", "custom.yml", "report", "--html"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("custom.yml", result.ConfigPath);
+        Assert.Equal("report", result.Command);
+    }
+
+    [Fact]
+    public void Parse_accepts_global_config_option_for_export()
+    {
+        var result = CliParser.Parse(["--config", "custom.yml", "export", "--format", "markdown"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("custom.yml", result.ConfigPath);
+        Assert.Equal("export", result.Command);
+    }
+
+    [Fact]
+    public void Parse_rejects_config_without_value()
+    {
+        var result = CliParser.Parse(["--config", "--", "record", "--", "dotnet"]);
+        Assert.False(result.IsSuccess);
+        Assert.Contains("--config requires a value", result.ErrorMessage);
+    }
+
+    [Fact]
+    public void Parse_config_at_end_is_recognized()
+    {
+        var result = CliParser.Parse(["record", "--", "dotnet", "--config", "test.yml"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("test.yml", result.ConfigPath);
     }
 }
