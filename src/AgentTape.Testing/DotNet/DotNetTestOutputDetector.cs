@@ -8,7 +8,7 @@ public sealed partial class DotNetTestOutputDetector : ITestResultDetector
 {
     public TestSummary Detect(string command, string stdout, string stderr)
     {
-        var combined = $"{stdout}\n{stderr}";
+        var combined = $"{(stdout ?? "")}\n{(stderr ?? "")}";
         var match = DotNetSummaryRegex().Match(combined);
         if (!match.Success)
         {
@@ -29,6 +29,6 @@ public sealed partial class DotNetTestOutputDetector : ITestResultDetector
         return int.TryParse(value, out var parsed) ? parsed : null;
     }
 
-    [GeneratedRegex(@"Total tests:\s*(?<total>\d+).+?Passed:\s*(?<passed>\d+).+?Failed:\s*(?<failed>\d+).+?Skipped:\s*(?<skipped>\d+)", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"Total tests:\s*(?<total>\d+).+?Passed:\s*(?<passed>\d+).+?Failed:\s*(?<failed>\d+)(?:.+?Skipped:\s*(?<skipped>\d+))?", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
     private static partial Regex DotNetSummaryRegex();
 }

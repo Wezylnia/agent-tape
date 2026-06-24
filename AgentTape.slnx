@@ -14,5 +14,7 @@
     <Project Path="tests/AgentTape.Git.Tests/AgentTape.Git.Tests.csproj" />
     <Project Path="tests/AgentTape.Redaction.Tests/AgentTape.Redaction.Tests.csproj" />
     <Project Path="tests/AgentTape.Reporting.Tests/AgentTape.Reporting.Tests.csproj" />
+    <Project Path="tests/AgentTape.Rules.Tests/AgentTape.Rules.Tests.csproj" />
+    <Project Path="tests/AgentTape.Testing.Tests/AgentTape.Testing.Tests.csproj" />
   </Folder>
 </Solution>

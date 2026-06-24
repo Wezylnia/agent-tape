@@ -4,6 +4,9 @@ using AgentTape.Core.Models;
 
 namespace AgentTape.Reporting.Markdown;
 
+/// <summary>
+/// Generates a GitHub-friendly Markdown summary from a TapeSession.
+/// </summary>
 public sealed class MarkdownReportGenerator : IReportGenerator
 {
     public string Format => "markdown";
@@ -11,63 +14,146 @@ public sealed class MarkdownReportGenerator : IReportGenerator
     public Task<string> GenerateAsync(TapeSession session, CancellationToken cancellationToken)
     {
         var builder = new StringBuilder();
+
+        // Session summary
         builder.AppendLine("# AgentTape Session Summary");
         builder.AppendLine();
-        builder.AppendLine($"- Session: `{session.Name}`");
-        builder.AppendLine($"- Duration: {FormatDuration(session.Duration)}");
-        builder.AppendLine($"- Working directory: `{session.WorkingDirectory}`");
-        builder.AppendLine($"- Commands executed: {session.Commands.Count}");
-        builder.AppendLine($"- Files changed: {session.FileChanges.Count}");
-        builder.AppendLine($"- Risk warnings: {session.Warnings.Count}");
+        builder.AppendLine("## Session");
+        builder.AppendLine();
+        builder.AppendLine($"- **Name:** `{Escape(session.Name)}`");
+        builder.AppendLine($"- **Duration:** {FormatDuration(session.Duration)}");
+        builder.AppendLine($"- **Working directory:** `{Escape(session.WorkingDirectory)}`");
+        builder.AppendLine($"- **Commands executed:** {session.Commands.Count}");
+        builder.AppendLine($"- **Files changed:** {session.FileChanges.Count}");
+        builder.AppendLine($"- **Risk warnings:** {session.Warnings.Count}");
+        builder.AppendLine($"- **Redaction mode:** {session.RedactionMode.ToString().ToLowerInvariant()}");
 
+        // Git info
         if (session.AfterGit is { IsRepository: true })
         {
-            builder.AppendLine($"- Branch: `{session.AfterGit.Branch}`");
-            builder.AppendLine($"- HEAD: `{session.AfterGit.HeadSha}`");
+            builder.AppendLine($"- **Branch:** `{Escape(session.AfterGit.Branch ?? "unknown")}`");
+            builder.AppendLine($"- **HEAD:** `{Escape(session.AfterGit.HeadSha ?? "unknown")}`");
         }
 
         builder.AppendLine();
-        builder.AppendLine("## Commands");
-        foreach (var command in session.Commands)
-        {
-            builder.AppendLine($"- `{command.Command}` exited `{command.ExitCode}` in {FormatDuration(command.Duration)}");
-        }
 
+        // Commands
+        builder.AppendLine("## Commands Executed");
         builder.AppendLine();
-        builder.AppendLine("## Changed Files");
-        if (session.FileChanges.Count == 0)
+        if (session.Commands.Count == 0)
         {
-            builder.AppendLine("- No changed files captured.");
+            builder.AppendLine("_No commands captured._");
         }
         else
         {
-            foreach (var change in session.FileChanges)
+            builder.AppendLine("| # | Command | Exit | Duration |");
+            builder.AppendLine("|---|---|---|---|");
+            var index = 1;
+            foreach (var command in session.Commands)
             {
-                builder.AppendLine($"- {change.Kind}: `{change.Path}`");
+                builder.AppendLine($"| {index} | `{Escape(command.Command)}` | {command.ExitCode} | {FormatDuration(command.Duration)} |");
+                index++;
             }
         }
-
         builder.AppendLine();
+
+        // Changed files
+        builder.AppendLine("## Changed Files");
+        builder.AppendLine();
+        if (session.FileChanges.Count == 0)
+        {
+            builder.AppendLine("_No changed files captured._");
+        }
+        else
+        {
+            builder.AppendLine("| Kind | Path |");
+            builder.AppendLine("|---|---|");
+            foreach (var change in session.FileChanges)
+            {
+                var path = change.OldPath is not null
+                    ? $"{Escape(change.OldPath)} → {Escape(change.Path)}"
+                    : Escape(change.Path);
+                builder.AppendLine($"| {change.Kind} | `{path}` |");
+            }
+        }
+        builder.AppendLine();
+
+        // Test summary
+        builder.AppendLine("## Test Results");
+        builder.AppendLine();
+        var testSummary = session.TestSummaries.FirstOrDefault(s => s.HasAnySignal);
+        if (testSummary?.HasAnySignal == true)
+        {
+            builder.AppendLine($"- **Total:** {testSummary.Total}");
+            builder.AppendLine($"- **Passed:** {testSummary.Passed}");
+            builder.AppendLine($"- **Failed:** {testSummary.Failed}");
+            builder.AppendLine($"- **Skipped:** {testSummary.Skipped}");
+        }
+        else
+        {
+            builder.AppendLine("_No test signals detected._");
+        }
+        builder.AppendLine();
+
+        // Risk warnings
         builder.AppendLine("## Risk Warnings");
+        builder.AppendLine();
         if (session.Warnings.Count == 0)
         {
-            builder.AppendLine("- No risk warnings detected.");
+            builder.AppendLine("_No risk warnings detected._");
         }
         else
         {
             foreach (var warning in session.Warnings)
             {
-                builder.AppendLine($"- **{warning.Code}** ({warning.Severity}): {warning.Message}");
+                var icon = warning.Severity switch
+                {
+                    RiskSeverity.High => "🔴",
+                    RiskSeverity.Warning => "🟡",
+                    _ => "ℹ️"
+                };
+                builder.AppendLine($"- {icon} **{Escape(warning.Code)}**: {Escape(warning.Message)}");
             }
         }
+        builder.AppendLine();
+
+        // Reproduction command
+        builder.AppendLine("## Reproduction");
+        builder.AppendLine();
+        if (session.Commands.Count > 0)
+        {
+            builder.AppendLine("```bash");
+            builder.AppendLine($"cd {Escape(session.WorkingDirectory)}");
+            foreach (var command in session.Commands)
+            {
+                builder.AppendLine(command.Command);
+            }
+            builder.AppendLine("```");
+        }
+        builder.AppendLine();
+
+        // Redaction note
+        builder.AppendLine("---");
+        builder.AppendLine();
+        builder.AppendLine($"_Report generated by AgentTape. Output redacted with **{session.RedactionMode.ToString().ToLowerInvariant()}** mode. No raw secrets are included._");
 
         return Task.FromResult(builder.ToString());
     }
 
-    private static string FormatDuration(TimeSpan duration)
+    internal static string Escape(string value)
     {
-        return duration.TotalSeconds < 60
-            ? $"{duration.TotalSeconds:0.0}s"
-            : $"{duration.TotalMinutes:0.0}m";
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("|", "\\|")
+            .Replace("`", "\\`");
+    }
+
+    internal static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalSeconds < 1)
+            return $"{duration.TotalMilliseconds:0}ms";
+        if (duration.TotalSeconds < 60)
+            return $"{duration.TotalSeconds:0.0}s";
+        return $"{duration.TotalMinutes:0.0}m";
     }
 }
