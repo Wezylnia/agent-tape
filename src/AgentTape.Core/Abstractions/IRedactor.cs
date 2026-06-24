@@ -5,4 +5,6 @@ namespace AgentTape.Core.Abstractions;
 public interface IRedactor
 {
     string Redact(string input, RedactionMode mode);
+
+    RedactionResult RedactWithSummary(string input, RedactionMode mode);
 }

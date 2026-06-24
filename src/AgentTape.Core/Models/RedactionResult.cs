@@ -1,4 +1,4 @@
-namespace AgentTape.Redaction.Rules;
+namespace AgentTape.Core.Models;
 
 /// <summary>
 /// Result of applying redaction to a string.

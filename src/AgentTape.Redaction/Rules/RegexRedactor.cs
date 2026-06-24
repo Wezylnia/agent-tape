@@ -13,32 +13,80 @@ public sealed partial class RegexRedactor : IRedactor
 {
     public string Redact(string input, RedactionMode mode)
     {
+        return RedactWithSummary(input, mode).Text;
+    }
+
+    public RedactionResult RedactWithSummary(string input, RedactionMode mode)
+    {
         if (mode == RedactionMode.Off || string.IsNullOrEmpty(input))
         {
-            return input;
+            return new RedactionResult { Text = input ?? string.Empty };
         }
 
         var output = input;
+        var summaries = new List<RedactionMatchSummary>();
 
         // Standard rules
-        output = GitHubTokenRegex().Replace(output, "ghp_***");
-        output = GitHubFineGrainedTokenRegex().Replace(output, "github_pat_***");
-        output = OpenAiKeyRegex().Replace(output, "sk-***");
-        output = AwsAccessKeyRegex().Replace(output, "AKIA***");
-        output = JwtRegex().Replace(output, "eyJ***.***.***");
-        output = PasswordAssignmentRegex().Replace(output, "$1=***");
-        output = BearerTokenRegex().Replace(output, "Bearer ***");
-        output = WindowsUserPathRegex().Replace(output, @"C:\Users\<user>");
-        output = UnixHomePathRegex().Replace(output, "/home/<user>");
+        (output, var count) = ApplyRule(GitHubTokenRegex(), output, "ghp_***", "GitHub Classic Token");
+        AddSummary(summaries, "GitHub Classic Token", count);
+
+        (output, count) = ApplyRule(GitHubFineGrainedTokenRegex(), output, "github_pat_***", "GitHub Fine-Grained Token");
+        AddSummary(summaries, "GitHub Fine-Grained Token", count);
+
+        (output, count) = ApplyRule(OpenAiKeyRegex(), output, "sk-***", "OpenAI API Key");
+        AddSummary(summaries, "OpenAI API Key", count);
+
+        (output, count) = ApplyRule(AwsAccessKeyRegex(), output, "AKIA***", "AWS Access Key");
+        AddSummary(summaries, "AWS Access Key", count);
+
+        (output, count) = ApplyRule(JwtRegex(), output, "eyJ***.***.***", "JWT Token");
+        AddSummary(summaries, "JWT Token", count);
+
+        (output, count) = ApplyRule(PasswordAssignmentRegex(), output, "$1=***", "Password/Secret Assignment");
+        AddSummary(summaries, "Password/Secret Assignment", count);
+
+        (output, count) = ApplyRule(BearerTokenRegex(), output, "Bearer ***", "Bearer Token");
+        AddSummary(summaries, "Bearer Token", count);
+
+        (output, count) = ApplyRule(WindowsUserPathRegex(), output, @"C:\Users\<user>", "Windows User Path");
+        AddSummary(summaries, "Windows User Path", count);
+
+        (output, count) = ApplyRule(UnixHomePathRegex(), output, "/home/<user>", "Unix Home Path");
+        AddSummary(summaries, "Unix Home Path", count);
 
         // Strict rules (additive)
         if (mode == RedactionMode.Strict)
         {
-            output = EmailRegex().Replace(output, "<email>");
-            output = NonLoopbackIPv4Regex().Replace(output, "<ip>");
+            (output, count) = ApplyRule(EmailRegex(), output, "<email>", "Email Address");
+            AddSummary(summaries, "Email Address", count);
+
+            (output, count) = ApplyRule(NonLoopbackIPv4Regex(), output, "<ip>", "Non-Loopback IPv4");
+            AddSummary(summaries, "Non-Loopback IPv4", count);
         }
 
-        return output;
+        var totalCount = summaries.Sum(s => s.Count);
+        return new RedactionResult
+        {
+            Text = output,
+            MatchCount = totalCount,
+            Summaries = summaries
+        };
+    }
+
+    private static (string Output, int Count) ApplyRule(Regex regex, string input, string replacement, string _)
+    {
+        var matches = regex.Matches(input);
+        var count = matches.Count;
+        var output = count > 0 ? regex.Replace(input, replacement) : input;
+        return (output, count);
+    }
+
+    private static void AddSummary(List<RedactionMatchSummary> summaries, string ruleName, int count)
+    {
+        if (count > 0)
+        {
+            summaries.Add(new RedactionMatchSummary { RuleName = ruleName, Count = count });
+        }
     }
 
     // --- Standard patterns ---

@@ -1,4 +1,4 @@
-namespace AgentTape.Redaction.Rules;
+namespace AgentTape.Core.Models;
 
 /// <summary>
 /// Summary of matches for a single redaction rule. No secret values are included.
