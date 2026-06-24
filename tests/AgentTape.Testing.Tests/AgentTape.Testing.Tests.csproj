@@ -25,4 +25,10 @@
     <ProjectReference Include="..\..\src\AgentTape.Core\AgentTape.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="DotNet\sample.trx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

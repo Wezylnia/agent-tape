@@ -3,6 +3,7 @@ using AgentTape.Core.Configuration;
 using AgentTape.Core.Models;
 using AgentTape.Core.Storage;
 using AgentTape.Cli.Parsing;
+using AgentTape.Testing.DotNet;
 
 namespace AgentTape.Cli.Commands;
 
@@ -146,7 +147,7 @@ public sealed class RecordCommand
             FileChanges = afterGit.Changes,
             PreExistingChanges = preExistingChanges,
             SessionChanges = sessionChanges,
-            TestSummaries = [_testDetector.Detect(command.Command, result.Stdout, result.Stderr)]
+            TestSummaries = BuildTestSummaries(command.Command, result.Stdout, result.Stderr, workingDirectory)
         };
 
         session = session with { Warnings = _riskRule.Evaluate(session) };
@@ -257,6 +258,112 @@ public sealed class RecordCommand
             }
             return change;
         }).ToArray();
+    }
+
+    private IReadOnlyList<TestSummary> BuildTestSummaries(string command, string stdout, string stderr, string workingDirectory)
+    {
+        var summaries = new List<TestSummary>();
+
+        // Console output detection
+        var consoleSummary = _testDetector.Detect(command, stdout, stderr);
+        if (consoleSummary.HasAnySignal)
+        {
+            summaries.Add(consoleSummary);
+        }
+
+        // TRX file detection
+        try
+        {
+            var trxSummary = ScanTrxFiles(workingDirectory);
+            if (trxSummary.HasAnySignal)
+            {
+                summaries.Add(trxSummary);
+            }
+        }
+        catch
+        {
+            // TRX parsing is best-effort
+        }
+
+        return summaries;
+    }
+
+    private static TestSummary ScanTrxFiles(string workingDirectory)
+    {
+        // Scan under working directory for .trx files, limited depth
+        var trxFiles = new List<string>();
+        try
+        {
+            ScanForTrx(workingDirectory, trxFiles, depth: 0, maxDepth: 5, maxFiles: 10);
+        }
+        catch
+        {
+            // Best-effort
+        }
+
+        if (trxFiles.Count == 0)
+            return new TestSummary();
+
+        var aggregated = new TestSummary();
+        foreach (var trxFile in trxFiles)
+        {
+            try
+            {
+                var content = File.ReadAllText(trxFile);
+                var summary = TrxParser.Parse(content);
+                aggregated = AggregateSummary(aggregated, summary);
+            }
+            catch
+            {
+                // Skip malformed TRX files
+            }
+        }
+
+        return aggregated;
+    }
+
+    private static void ScanForTrx(string directory, List<string> results, int depth, int maxDepth, int maxFiles)
+    {
+        if (depth > maxDepth || results.Count >= maxFiles)
+            return;
+
+        try
+        {
+            foreach (var file in Directory.GetFiles(directory, "*.trx"))
+            {
+                if (results.Count >= maxFiles)
+                    return;
+                results.Add(file);
+            }
+
+            foreach (var subDir in Directory.GetDirectories(directory))
+            {
+                var dirName = Path.GetFileName(subDir);
+                // Skip common non-project directories
+                if (dirName is "bin" or "obj" or "node_modules" or ".git" or ".agenttape")
+                    continue;
+
+                ScanForTrx(subDir, results, depth + 1, maxDepth, maxFiles);
+            }
+        }
+        catch
+        {
+            // Permission errors etc.
+        }
+    }
+
+    private static TestSummary AggregateSummary(TestSummary a, TestSummary b)
+    {
+        return new TestSummary
+        {
+            Total = (a.Total ?? 0) + (b.Total ?? 0),
+            Passed = (a.Passed ?? 0) + (b.Passed ?? 0),
+            Failed = (a.Failed ?? 0) + (b.Failed ?? 0),
+            Skipped = (a.Skipped ?? 0) + (b.Skipped ?? 0),
+            FailedTestNames = (a.FailedTestNames ?? Array.Empty<string>())
+                .Concat(b.FailedTestNames ?? Array.Empty<string>())
+                .ToArray()
+        };
     }
 
     private static IReadOnlyList<RedactionMatchSummary> MergeSummaries(params RedactionResult[] results)
