@@ -18,12 +18,18 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>agenttape</ToolCommandName>
     <PackageId>AgentTape</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Authors>AgentTape Contributors</Authors>
     <Description>Flight recorder for AI coding agent sessions. Records, redacts, and packages development session evidence into safe, reproducible developer timelines.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/Wezylnia/agent-tape</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Wezylnia/agent-tape</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>agent;ai;coding-agent;cli;developer-tools;dotnet;git;redaction;reporting;testing</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>

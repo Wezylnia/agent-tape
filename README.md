@@ -54,7 +54,7 @@ dotnet build AgentTape.slnx
 dotnet test AgentTape.slnx
 ```
 
-Run the current CLI skeleton:
+Run the CLI from source:
 
 ```bash
 dotnet run --project src/AgentTape.Cli/AgentTape.Cli.csproj -- --help
@@ -63,7 +63,7 @@ dotnet run --project src/AgentTape.Cli/AgentTape.Cli.csproj -- record -- dotnet 
 
 ## What Gets Recorded
 
-Planned v0.1 capture scope:
+Current v1.0 capture scope:
 
 - command text, start time, finish time, duration, and exit code
 - redacted stdout and stderr
@@ -99,18 +99,11 @@ Read [docs/architecture.md](docs/architecture.md) and [docs/roadmap.md](docs/roa
 
 ## Roadmap
 
-| Version | Focus |
-| --- | --- |
-| `v0.1` | Local flight recorder: command capture, git diff, redaction, HTML/Markdown reports |
-| `v0.2` | Test-aware reports: TRX, xUnit/NUnit XML, before/after comparison |
-| `v0.3` | Agent-aware workflows: Codex, Claude, Aider profiles and opt-in prompt capture |
-| `v1.0` | Stable shareable AI coding session report format |
-
-See [docs/roadmap.md](docs/roadmap.md) for the detailed plan.
+The v1.0 local flight recorder is the first stable release target. See [docs/roadmap.md](docs/roadmap.md) for follow-up directions.
 
 ## Contributing
 
-Contributor help is welcome once v0.1 issues are opened. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then look for issues labeled `good first issue`, `contributor-ready`, or `help wanted`.
+Contributor help is welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then look for issues labeled `good first issue`, `contributor-ready`, or `help wanted`.
 
 ## Security
 

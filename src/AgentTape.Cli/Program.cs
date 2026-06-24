@@ -35,7 +35,8 @@ internal static class AgentTapeProgram
         // Check for --version
         if (args.Any(a => a is "--version" or "-v"))
         {
-            Console.WriteLine("AgentTape 1.0.0");
+            var version = typeof(AgentTapeProgram).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+            Console.WriteLine($"AgentTape {version}");
             return 0;
         }
 
@@ -117,10 +118,12 @@ AgentTape - Flight recorder for AI coding agent sessions.
 Usage:
   agenttape init
   agenttape record [--name <name>] [--redact standard|strict|off] [--no-git] [--config <path>] -- <command> [args]
+  agenttape record [--name <name>] [--redact standard|strict|off] [--no-git] --shell "<command>"
   agenttape list
   agenttape show <session-id>
   agenttape report [--html] [--markdown] [--open] [--session <session-id>]
-  agenttape export --format markdown|json [--session <session-id>]
+  agenttape export --format markdown|json|html [--session <session-id>] [--output <path>]
+  agenttape export --github-pr [--session <session-id>] [--output <path>]
 
 Exit codes:
   0  Success

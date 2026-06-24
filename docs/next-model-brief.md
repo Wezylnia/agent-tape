@@ -1,6 +1,6 @@
-# Next Model Brief
+# Maintainer Brief
 
-This repository is an implementation skeleton. Do not invent a new architecture. Continue from the existing module boundaries and finish v0.1 in small, verifiable steps.
+This repository contains the v1.0 AgentTape implementation. Do not invent a new architecture for follow-up work. Continue from the existing module boundaries and make small, verifiable changes.
 
 ## Read First
 
@@ -21,14 +21,15 @@ Follow-up implementation should stay within the public architecture and roadmap 
 - Reporting is static Markdown and HTML
 - Test parsing starts with dotnet text output
 
-## First Implementation Target
+## Current Maintenance Target
 
-Finish the v0.1 session storage flow before adding new feature areas:
+Preserve the v1.0 CLI and package behavior while improving reliability, report quality, and parser coverage:
 
-- `FileSystemSessionStore`
-- `SessionIdFactory`
-- strict session layout tests
-- CLI integration that writes through the store instead of direct ad hoc file writes
+- keep global tool packaging working,
+- keep redaction enabled by default,
+- preserve wrapped command arguments after `--`,
+- add tests before changing CLI parsing, storage, redaction, reporting, or git behavior,
+- keep generated report formats backward-compatible unless a release note calls out the change.
 
 Required checks:
 

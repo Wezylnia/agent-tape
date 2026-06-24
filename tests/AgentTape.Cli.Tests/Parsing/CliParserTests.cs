@@ -220,10 +220,20 @@ public sealed class CliParserTests
     }
 
     [Fact]
-    public void Parse_config_at_end_is_recognized()
+    public void Parse_record_preserves_config_after_separator_as_wrapped_argument()
     {
         var result = CliParser.Parse(["record", "--", "dotnet", "--config", "test.yml"]);
         Assert.True(result.IsSuccess);
+        Assert.Null(result.ConfigPath);
+        Assert.Equal(["--config", "test.yml"], result.WrappedArguments);
+    }
+
+    [Fact]
+    public void Parse_record_accepts_config_before_separator()
+    {
+        var result = CliParser.Parse(["record", "--config", "test.yml", "--", "dotnet"]);
+        Assert.True(result.IsSuccess);
         Assert.Equal("test.yml", result.ConfigPath);
+        Assert.Equal("dotnet", result.WrappedExecutable);
     }
 }

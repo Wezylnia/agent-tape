@@ -4,7 +4,7 @@ All notable changes to AgentTape will be documented in this file.
 
 This project follows semantic versioning once packaged releases begin.
 
-## Unreleased
+## 1.0.0 - 2026-06-24
 
 ### Added
 

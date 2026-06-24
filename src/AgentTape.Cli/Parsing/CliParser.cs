@@ -30,30 +30,23 @@ public static class CliParser
             };
         }
 
-        // Extract global --config option before command dispatch
         string? configPath = null;
-        var remainingArgs = new List<string>();
-        for (var i = 0; i < args.Length; i++)
+        var remainingArray = args;
+        if (args[0].Equals("--config", StringComparison.OrdinalIgnoreCase))
         {
-            if (args[i].Equals("--config", StringComparison.OrdinalIgnoreCase))
+            if (args.Length < 3 || args[1].StartsWith("--"))
             {
-                if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                return new CliParseResult
                 {
-                    return new CliParseResult
-                    {
-                        IsSuccess = false,
-                        ErrorMessage = "--config requires a value."
-                    };
-                }
-                configPath = args[++i];
+                    IsSuccess = false,
+                    ErrorMessage = "--config requires a value."
+                };
             }
-            else
-            {
-                remainingArgs.Add(args[i]);
-            }
+
+            configPath = args[1];
+            remainingArray = args[2..];
         }
 
-        var remainingArray = remainingArgs.ToArray();
         if (remainingArray.Length == 0)
         {
             return new CliParseResult
@@ -80,7 +73,7 @@ public static class CliParser
             }
         };
 
-        return commandResult with { ConfigPath = configPath };
+        return commandResult with { ConfigPath = commandResult.ConfigPath ?? configPath };
     }
 
     private static CliParseResult ParseInit(string[] args)
@@ -241,6 +234,19 @@ public static class CliParser
 
             case "--no-git":
                 result = result with { NoGit = true };
+                break;
+
+            case "--config":
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--"))
+                {
+                    return new CliParseResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "--config requires a value."
+                    };
+                }
+
+                result = result with { ConfigPath = args[++i] };
                 break;
 
             default:

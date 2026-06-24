@@ -36,4 +36,4 @@ jobs:
         run: dotnet test AgentTape.slnx --no-build
 
       - name: Pack
-        run: dotnet pack -c Release --no-build
+        run: dotnet pack src/AgentTape.Cli/AgentTape.Cli.csproj -c Release --no-restore

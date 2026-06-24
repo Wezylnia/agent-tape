@@ -120,13 +120,13 @@ Modes:
 - `Standard`: masks common tokens, passwords, JWTs, connection string secrets, and local user paths. This is the default.
 - `Strict`: includes `Standard` behavior plus additional identity-oriented masking such as email addresses.
 
-Redaction is local-only and rule-based in v0.1. It must not call an external service.
+Redaction is local-only and rule-based. It must not call an external service.
 
 ### AgentTape.Reporting
 
 Reporting turns a `TapeSession` into local artifacts.
 
-MVP report formats:
+Current report formats:
 
 - Markdown for pull request and issue summaries,
 - static HTML for shareable local reports.
@@ -137,7 +137,7 @@ Reporting must always HTML-encode untrusted content and must consume redacted da
 
 Testing parsers extract deterministic test signals from command output or imported test files.
 
-MVP scope:
+Current parser scope:
 
 - basic `dotnet test` text output detection.
 
@@ -166,7 +166,7 @@ Initial warning families:
 - binary files changed,
 - large deletes.
 
-Rules should be deterministic and explainable. Do not add an opaque scoring engine in the MVP.
+Rules should be deterministic and explainable. Do not add an opaque scoring engine to the local recorder.
 
 ## Dependency Direction
 
@@ -219,7 +219,7 @@ If `dotnet test` exits with `1`, AgentTape must also exit with `1`. AgentTape-sp
 
 ## Session Layout
 
-Target v0.1 layout:
+Current session layout:
 
 ```text
 .agenttape/
@@ -253,9 +253,9 @@ The layout should stay easy to inspect manually. Avoid opaque binary session for
 - Replay must start as dry-run only.
 - AgentTape must remain useful without an LLM.
 
-## Acceptable MVP Shortcuts
+## Acceptable Implementation Shortcuts
 
-These are acceptable in v0.1:
+These are acceptable in the current local-first implementation:
 
 - simple hand-written CLI parsing,
 - direct constructor wiring instead of a dependency injection container,
