@@ -26,14 +26,17 @@ AgentTape turns that local session into a reviewable timeline instead of a raw t
 
 ## Current Status
 
-This repository is at the v0.1 foundation stage. The architecture, project skeleton, domain contracts, initial CLI flow, reporting skeleton, redaction skeleton, and implementation plan are in place.
+The v1.0 CLI is functional. All core features including config loading, session management, redaction, git delta tracking, TRX parsing, environment capture, and report/export generation are implemented.
 
-Target v0.1 workflow:
+Quick start:
 
 ```bash
-agenttape record -- dotnet test
-agenttape report
-agenttape export --format markdown
+agenttape init
+agenttape record --name demo -- dotnet test --logger trx
+agenttape list
+agenttape show <session-id>
+agenttape report --open
+agenttape export --github-pr --output pr-summary.md
 ```
 
 ## Quick Start From Source
