@@ -10,9 +10,6 @@ public sealed class InitCommandTests : IDisposable
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"agenttape-init-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
-
-        // Change to temp directory so InitCommand creates .agenttape.yml there
-        Environment.CurrentDirectory = _tempDir;
     }
 
     public void Dispose()
@@ -26,7 +23,7 @@ public sealed class InitCommandTests : IDisposable
         var configPath = Path.Combine(_tempDir, ".agenttape.yml");
         Assert.False(File.Exists(configPath));
 
-        var exitCode = InitCommand.Execute();
+        var exitCode = InitCommand.Execute(_tempDir);
 
         Assert.Equal(CommandExitCodes.Success, exitCode);
         Assert.True(File.Exists(configPath));
@@ -44,7 +41,7 @@ public sealed class InitCommandTests : IDisposable
         var customContent = "project:\n  name: custom-project\n";
         File.WriteAllText(configPath, customContent);
 
-        var exitCode = InitCommand.Execute();
+        var exitCode = InitCommand.Execute(_tempDir);
 
         Assert.Equal(CommandExitCodes.Success, exitCode);
         var content = File.ReadAllText(configPath);

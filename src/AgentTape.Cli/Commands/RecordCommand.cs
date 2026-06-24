@@ -23,6 +23,7 @@ public sealed class RecordCommand
     private readonly ITestResultDetector _testDetector;
     private readonly IRiskRule _riskRule;
     private readonly AgentTapeOptions _options;
+    private readonly Func<string> _workingDirectoryProvider;
 
     public RecordCommand(
         IClock clock,
@@ -34,7 +35,8 @@ public sealed class RecordCommand
         IReportGenerator htmlGenerator,
         ITestResultDetector testDetector,
         IRiskRule riskRule,
-        AgentTapeOptions options)
+        AgentTapeOptions options,
+        Func<string>? workingDirectoryProvider = null)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _commandRunner = commandRunner ?? throw new ArgumentNullException(nameof(commandRunner));
@@ -46,11 +48,12 @@ public sealed class RecordCommand
         _testDetector = testDetector ?? throw new ArgumentNullException(nameof(testDetector));
         _riskRule = riskRule ?? throw new ArgumentNullException(nameof(riskRule));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _workingDirectoryProvider = workingDirectoryProvider ?? Directory.GetCurrentDirectory;
     }
 
     public async Task<int> ExecuteAsync(CliParseResult parseResult, CancellationToken cancellationToken)
     {
-        var workingDirectory = Directory.GetCurrentDirectory();
+        var workingDirectory = _workingDirectoryProvider();
         var redactionMode = parseResult.Redact is not null
             ? ParseRedactionMode(parseResult.Redact)
             : _options.RedactionMode;
@@ -122,6 +125,7 @@ public sealed class RecordCommand
 
         var command = result.Run with
         {
+            Command = _redactor.Redact(result.Run.Command, redactionMode),
             RedactedStdoutPreview = _redactor.Redact(result.Stdout, redactionMode),
             RedactedStderrPreview = _redactor.Redact(result.Stderr, redactionMode)
         };
@@ -172,10 +176,11 @@ public sealed class RecordCommand
         // Build redaction summaries
         var stdoutResult = _redactor.RedactWithSummary(result.Stdout, redactionMode);
         var stderrResult = _redactor.RedactWithSummary(result.Stderr, redactionMode);
+        var commandResult = _redactor.RedactWithSummary(result.Run.Command, redactionMode);
         var diffResult = _redactor.RedactWithSummary(diff, redactionMode);
         var wdResult = _redactor.RedactWithSummary(workingDirectory, redactionMode);
 
-        var allSummaries = MergeSummaries(stdoutResult, stderrResult, diffResult, wdResult);
+        var allSummaries = MergeSummaries(stdoutResult, stderrResult, commandResult, diffResult, wdResult);
 
         // Store session and generate reports
         var paths = await _sessionStore.CreateSessionLayoutAsync(session, cancellationToken);

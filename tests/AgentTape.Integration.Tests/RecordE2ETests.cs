@@ -44,7 +44,7 @@ public sealed class RecordE2ETests : IDisposable
     {
         var agenttapeDir = Path.Combine(_tempDir, ".agenttape");
         var options = new AgentTapeOptions { AgentTapeDirectory = agenttapeDir };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var parseResult = CliParser.Parse(["--config", "nonexistent.yml", "record", "--name", "e2e-test", "--no-git", "--", "dotnet", "--version"]);
         Assert.True(parseResult.IsSuccess);
@@ -83,7 +83,7 @@ public sealed class RecordE2ETests : IDisposable
 
         var agenttapeDir = Path.Combine(_tempDir, ".agenttape");
         var options = new AgentTapeOptions { AgentTapeDirectory = agenttapeDir };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var parseResult = CliParser.Parse(["record", "--name", "git-test", "--", "dotnet", "--version"]);
         Assert.True(parseResult.IsSuccess);
@@ -103,13 +103,9 @@ public sealed class RecordE2ETests : IDisposable
     {
         var agenttapeDir = Path.Combine(_tempDir, ".agenttape");
         var options = new AgentTapeOptions { AgentTapeDirectory = agenttapeDir };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
-        // Create a script that outputs fake secrets to stdout
-        var scriptPath = Path.Combine(_tempDir, "emit-secret.cmd");
-        await File.WriteAllTextAsync(scriptPath, "@echo off\necho Token: ghp_abcdefghijklmnopqrstuvwxyz123456");
-
-        var parseResult = CliParser.Parse(["record", "--name", "secret-test", "--no-git", "--", scriptPath]);
+        var parseResult = CliParser.Parse(["record", "--name", "secret-test", "--no-git", "--shell", "echo Token: ghp_abcdefghijklmnopqrstuvwxyz123456"]);
         Assert.True(parseResult.IsSuccess);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
@@ -128,7 +124,7 @@ public sealed class RecordE2ETests : IDisposable
         Assert.Contains("GitHub Classic Token", redactionLog);
     }
 
-    private static RecordCommand CreateRecordCommand(AgentTapeOptions options)
+    private static RecordCommand CreateRecordCommand(AgentTapeOptions options, string workingDirectory)
     {
         var clock = new SystemClock();
         return new RecordCommand(
@@ -141,7 +137,8 @@ public sealed class RecordE2ETests : IDisposable
             new HtmlReportGenerator(),
             new DotNetTestOutputDetector(),
             new DefaultRiskRules(),
-            options);
+            options,
+            () => workingDirectory);
     }
 
     private static void RunGit(string arguments, string workingDirectory)

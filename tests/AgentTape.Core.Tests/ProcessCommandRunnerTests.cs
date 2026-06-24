@@ -98,10 +98,8 @@ public sealed class ProcessCommandRunnerTests
     [Fact]
     public async Task RunAsync_bounds_preview_length()
     {
-        // Create a command that produces long output
-        // Use a shell echo with long text on Windows
         var longText = new string('x', 5000);
-        var request = CreateRequest("cmd", ["/c", $"echo {longText}"]);
+        var request = CreateShellRequest($"echo {longText}");
         var result = await _runner.RunAsync(request, CancellationToken.None);
 
         // Preview should be bounded, full output preserved
@@ -123,8 +121,9 @@ public sealed class ProcessCommandRunnerTests
     [Fact]
     public async Task RunAsync_kills_process_on_cancellation()
     {
-        // Use a command that sleeps for a while
-        var request = CreateRequest("cmd", ["/c", "timeout /t 30 /nobreak"]);
+        var request = OperatingSystem.IsWindows()
+            ? CreateRequest("cmd", ["/c", "timeout /t 30 /nobreak"])
+            : CreateRequest("/bin/sh", ["-c", "sleep 30"]);
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
         var startedAt = DateTimeOffset.UtcNow;
 
@@ -153,6 +152,13 @@ public sealed class ProcessCommandRunnerTests
             Arguments = arguments,
             WorkingDirectory = workingDirectory ?? Directory.GetCurrentDirectory()
         };
+    }
+
+    private static CommandRequest CreateShellRequest(string command)
+    {
+        return OperatingSystem.IsWindows()
+            ? CreateRequest("cmd", ["/c", command])
+            : CreateRequest("/bin/sh", ["-c", command]);
     }
 
     private sealed class FakeClock : IClock

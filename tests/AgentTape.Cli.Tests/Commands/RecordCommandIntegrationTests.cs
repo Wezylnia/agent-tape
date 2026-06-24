@@ -46,7 +46,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
     {
         var parseResult = CreateParseResult("dotnet", ["--version"]);
         var options = new AgentTapeOptions { AgentTapeDirectory = Path.Combine(_tempDir, ".agenttape") };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
@@ -68,7 +68,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
         // dotnet with invalid args exits non-zero
         var parseResult = CreateParseResult("dotnet", ["--invalid-flag-xyz-123"]);
         var options = new AgentTapeOptions { AgentTapeDirectory = Path.Combine(_tempDir, ".agenttape") };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
@@ -83,7 +83,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
         // _tempDir is NOT a git repo
         var parseResult = CreateParseResult("dotnet", ["--version"]);
         var options = new AgentTapeOptions { AgentTapeDirectory = Path.Combine(_tempDir, ".agenttape") };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
@@ -114,7 +114,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
 
         var parseResult = CreateParseResult("dotnet", ["--version"]);
         var options = new AgentTapeOptions { AgentTapeDirectory = Path.Combine(_tempDir, ".agenttape") };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
@@ -132,12 +132,10 @@ public sealed class RecordCommandIntegrationTests : IDisposable
     public async Task Record_redacts_secret_output_before_report_generation()
     {
         // Write a script that outputs a fake secret
-        var scriptPath = Path.Combine(_tempDir, "echo_secret.cmd");
-        await File.WriteAllTextAsync(scriptPath, "@echo off\r\necho token=ghp_abc123def456ghijklmnopqrstuv\r\necho Done.");
-
-        var parseResult = CreateParseResult("cmd", ["/c", scriptPath]);
+        var parseResult = CliParser.Parse(["record", "--name", "secret-test", "--no-git", "--shell", "echo token=ghp_abc123def456ghijklmnopqrstuv && echo Done."]);
+        Assert.True(parseResult.IsSuccess);
         var options = new AgentTapeOptions { AgentTapeDirectory = Path.Combine(_tempDir, ".agenttape") };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
@@ -167,7 +165,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
 
         var parseResult = CreateParseResult("dotnet", ["--version"]) with { NoGit = true };
         var options = new AgentTapeOptions { AgentTapeDirectory = Path.Combine(_tempDir, ".agenttape") };
-        var cmd = CreateRecordCommand(options);
+        var cmd = CreateRecordCommand(options, _tempDir);
 
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
@@ -193,7 +191,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
         };
     }
 
-    private static RecordCommand CreateRecordCommand(AgentTapeOptions options)
+    private static RecordCommand CreateRecordCommand(AgentTapeOptions options, string workingDirectory)
     {
         var clock = new AgentTape.Core.SystemClock();
         return new RecordCommand(
@@ -206,7 +204,8 @@ public sealed class RecordCommandIntegrationTests : IDisposable
             new HtmlReportGenerator(),
             new DotNetTestOutputDetector(),
             new DefaultRiskRules(),
-            options);
+            options,
+            () => workingDirectory);
     }
 
     private void RunGit(params string[] arguments)
