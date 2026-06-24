@@ -172,6 +172,12 @@ public sealed class RecordCommandTests
         {
             return Task.FromResult(string.Empty);
         }
+
+        public Task<IReadOnlyList<(string Path, int? AddedLines, int? DeletedLines, bool IsBinary)>> CaptureNumStatAsync(
+            string workingDirectory, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<(string, int?, int?, bool)>>(Array.Empty<(string, int?, int?, bool)>());
+        }
     }
 
     private sealed class FakeRedactor : IRedactor

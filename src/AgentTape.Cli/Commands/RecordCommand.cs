@@ -94,6 +94,7 @@ public sealed class RecordCommand
 
         GitSnapshot afterGit;
         string diff;
+        IReadOnlyList<(string Path, int? AddedLines, int? DeletedLines, bool IsBinary)> numstat = Array.Empty<(string, int?, int?, bool)>();
         if (skipGit)
         {
             afterGit = new GitSnapshot { IsRepository = false };
@@ -105,6 +106,7 @@ public sealed class RecordCommand
             {
                 afterGit = await _gitSnapshotProvider.CaptureAsync(workingDirectory, cancellationToken);
                 diff = await _gitSnapshotProvider.CaptureDiffAsync(workingDirectory, cancellationToken);
+                numstat = await _gitSnapshotProvider.CaptureNumStatAsync(workingDirectory, cancellationToken);
             }
             catch
             {
@@ -112,6 +114,9 @@ public sealed class RecordCommand
                 diff = string.Empty;
             }
         }
+
+        // Merge numstat data into file changes
+        afterGit = afterGit with { Changes = MergeNumStat(afterGit.Changes, numstat) };
 
         var command = result.Run with
         {
@@ -228,6 +233,30 @@ public sealed class RecordCommand
         var preExistingChanges = preExisting.Concat(overlapping).ToList();
 
         return (preExistingChanges, sessionChanges);
+    }
+
+    private static IReadOnlyList<FileChange> MergeNumStat(
+        IReadOnlyList<FileChange> changes,
+        IReadOnlyList<(string Path, int? AddedLines, int? DeletedLines, bool IsBinary)> numstat)
+    {
+        if (numstat.Count == 0)
+            return changes;
+
+        var numstatByPath = numstat.ToDictionary(n => n.Path, StringComparer.OrdinalIgnoreCase);
+
+        return changes.Select(change =>
+        {
+            if (numstatByPath.TryGetValue(change.Path, out var stats))
+            {
+                return change with
+                {
+                    AddedLines = stats.AddedLines,
+                    DeletedLines = stats.DeletedLines,
+                    IsBinary = stats.IsBinary
+                };
+            }
+            return change;
+        }).ToArray();
     }
 
     private static IReadOnlyList<RedactionMatchSummary> MergeSummaries(params RedactionResult[] results)
