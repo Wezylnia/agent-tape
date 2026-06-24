@@ -128,6 +128,25 @@ public sealed class MarkdownReportGeneratorTests
     }
 
     [Fact]
+    public void Escape_handles_formatting_characters()
+    {
+        Assert.Equal("\\*bold\\*", MarkdownReportGenerator.Escape("*bold*"));
+        Assert.Equal("\\#heading", MarkdownReportGenerator.Escape("#heading"));
+        Assert.Equal("\\~strike\\~", MarkdownReportGenerator.Escape("~strike~"));
+        Assert.Equal("\\[link\\]", MarkdownReportGenerator.Escape("[link]"));
+        Assert.Equal("block\\>quote", MarkdownReportGenerator.Escape("block>quote"));
+    }
+
+    [Fact]
+    public async Task GenerateAsync_escapes_markdown_in_session_name()
+    {
+        var session = CreateBasicSession() with { Name = "# DANGER *bold*" };
+        var markdown = await _generator.GenerateAsync(session, CancellationToken.None);
+        // The escaped version should appear, not the raw heading marker
+        Assert.Contains("\\# DANGER", markdown);
+    }
+
+    [Fact]
     public void FormatDuration_handles_milliseconds()
     {
         var result = MarkdownReportGenerator.FormatDuration(TimeSpan.FromMilliseconds(500));

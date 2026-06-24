@@ -109,6 +109,7 @@ public sealed class GitCliSnapshotProvider : IGitSnapshotProvider
             'R' => FileChangeKind.Renamed,
             'C' => FileChangeKind.Copied,
             'U' => FileChangeKind.Unmerged,
+            '?' => FileChangeKind.Untracked,
             'T' => FileChangeKind.TypeChanged,
             _ => FileChangeKind.Unknown
         };

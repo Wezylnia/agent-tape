@@ -70,7 +70,7 @@ public sealed class SessionIdFactoryTests
         var startedAt = DateTimeOffset.UtcNow;
         var veryLongName = new string('a', 200);
         var id = SessionIdFactory.Create(veryLongName, startedAt);
-        Assert.True(id.Length <= 80);
+        Assert.True(id.Length <= 120);
     }
 
     [Fact]

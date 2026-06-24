@@ -75,7 +75,7 @@ public sealed partial class RegexRedactor : IRedactor
     [GeneratedRegex(@"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     private static partial Regex EmailRegex();
 
-    [GeneratedRegex(@"\b(?!127\.0\.0\.1\b)(\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled)]
+    [GeneratedRegex(@"\b(?!127\.)(\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled)]
     private static partial Regex NonLoopbackIPv4Regex();
 }
 

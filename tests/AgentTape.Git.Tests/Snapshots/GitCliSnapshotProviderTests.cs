@@ -94,6 +94,7 @@ public sealed class GitCliSnapshotProviderTests : IDisposable
         var changes = GitCliSnapshotProvider.ParsePorcelainStatus(status);
         Assert.Single(changes);
         Assert.Equal("newfile.txt", changes[0].Path);
+        Assert.Equal(FileChangeKind.Untracked, changes[0].Kind);
     }
 
     // --- Integration tests using temporary git repository ---

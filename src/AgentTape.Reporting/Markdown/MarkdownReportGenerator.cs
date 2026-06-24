@@ -142,10 +142,19 @@ public sealed class MarkdownReportGenerator : IReportGenerator
 
     internal static string Escape(string value)
     {
+        // Escape backslash first, then other markdown-sensitive chars.
+        // Underscore is only escaped at word boundaries by markdown;
+        // internal underscores (like TEST_WARN) are safe, so we skip it.
         return value
             .Replace("\\", "\\\\")
+            .Replace("`", "\\`")
+            .Replace("*", "\\*")
+            .Replace("#", "\\#")
             .Replace("|", "\\|")
-            .Replace("`", "\\`");
+            .Replace("~", "\\~")
+            .Replace("[", "\\[")
+            .Replace("]", "\\]")
+            .Replace(">", "\\>");
     }
 
     internal static string FormatDuration(TimeSpan duration)

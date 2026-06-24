@@ -134,12 +134,10 @@ public sealed class DefaultRiskRules : IRiskRule
         {
             var normalized = command.Command.ToLowerInvariant();
 
-            // Suspicious commands
+            // Suspicious commands (destructive/file-manipulation)
             if (normalized.Contains("rm -rf", StringComparison.Ordinal) ||
                 normalized.Contains("del /s", StringComparison.Ordinal) ||
-                normalized.Contains("invoke-expression", StringComparison.Ordinal) ||
-                (normalized.Contains("curl", StringComparison.Ordinal) && normalized.Contains('|')) ||
-                (normalized.Contains("wget", StringComparison.Ordinal) && normalized.Contains('|')))
+                normalized.Contains("invoke-expression", StringComparison.Ordinal))
             {
                 warnings.Add(new RiskWarning
                 {
@@ -147,6 +145,24 @@ public sealed class DefaultRiskRules : IRiskRule
                     Severity = RiskSeverity.High,
                     CommandId = command.Id,
                     Message = $"Suspicious command pattern captured: {command.Command}"
+                });
+            }
+
+            // Network script execution (curl/wget piped to shell interpreter)
+            if ((normalized.Contains("curl", StringComparison.Ordinal) ||
+                 normalized.Contains("wget", StringComparison.Ordinal)) &&
+                normalized.Contains('|') &&
+                (normalized.Contains("bash", StringComparison.Ordinal) ||
+                 normalized.Contains("sh ", StringComparison.Ordinal) ||
+                 normalized.EndsWith("sh", StringComparison.Ordinal) ||
+                 normalized.Contains("cmd", StringComparison.Ordinal)))
+            {
+                warnings.Add(new RiskWarning
+                {
+                    Code = "NETWORK_SCRIPT_EXEC",
+                    Severity = RiskSeverity.High,
+                    CommandId = command.Id,
+                    Message = $"Network download piped to shell interpreter: {command.Command}"
                 });
             }
 

@@ -124,6 +124,15 @@ public sealed class RegexRedactorTests
     }
 
     [Fact]
+    public void Strict_does_not_mask_loopback_network()
+    {
+        var output = _redactor.Redact("Loopback: 127.0.0.99 and 127.255.255.1", RedactionMode.Strict);
+        Assert.Contains("127.0.0.99", output);
+        Assert.Contains("127.255.255.1", output);
+        Assert.DoesNotContain("<ip>", output);
+    }
+
+    [Fact]
     public void Strict_includes_standard_rules()
     {
         var output = _redactor.Redact("token=secret123 alice@example.com", RedactionMode.Strict);

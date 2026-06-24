@@ -200,6 +200,7 @@ public sealed class RecordCommandTests
                 StdoutDirectory = Path.Combine(tmp, "stdout"),
                 StderrDirectory = Path.Combine(tmp, "stderr"),
                 GitDirectory = Path.Combine(tmp, "git"),
+                TestsDirectory = Path.Combine(tmp, "tests"),
                 ReportsDirectory = Path.Combine(tmp, "reports")
             };
             Directory.CreateDirectory(tmp);

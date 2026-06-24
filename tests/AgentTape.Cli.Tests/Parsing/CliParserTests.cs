@@ -116,4 +116,71 @@ public sealed class CliParserTests
         Assert.False(result.IsSuccess);
         Assert.Contains("Invalid export format", result.ErrorMessage);
     }
+
+    [Fact]
+    public void Parse_record_accepts_no_git_option()
+    {
+        var result = CliParser.Parse(["record", "--no-git", "--", "dotnet"]);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.NoGit);
+    }
+
+    [Fact]
+    public void Parse_report_accepts_markdown()
+    {
+        var result = CliParser.Parse(["report", "--markdown"]);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Markdown);
+    }
+
+    [Fact]
+    public void Parse_report_accepts_open()
+    {
+        var result = CliParser.Parse(["report", "--open"]);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Open);
+    }
+
+    [Fact]
+    public void Parse_init_rejects_extra_arguments()
+    {
+        var result = CliParser.Parse(["init", "extra"]);
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public void Parse_export_accepts_valid_markdown_format()
+    {
+        var result = CliParser.Parse(["export", "--format", "markdown"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("markdown", result.Format);
+    }
+
+    [Fact]
+    public void Parse_export_accepts_valid_json_format()
+    {
+        var result = CliParser.Parse(["export", "--format", "json"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("json", result.Format);
+    }
+
+    [Fact]
+    public void Parse_record_rejects_empty_command_after_separator()
+    {
+        var result = CliParser.Parse(["record", "--"]);
+        Assert.False(result.IsSuccess);
+        Assert.Contains("No command to record", result.ErrorMessage);
+    }
+
+    [Fact]
+    public void Parse_record_accepts_multiple_options_combined()
+    {
+        var result = CliParser.Parse(["record", "--name", "my-session", "--no-git", "--redact", "strict", "--", "dotnet", "test"]);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("my-session", result.Name);
+        Assert.True(result.NoGit);
+        Assert.Equal("strict", result.Redact);
+        Assert.Equal("dotnet", result.WrappedExecutable);
+        Assert.Contains("test", result.WrappedArguments);
+    }
 }

@@ -7,7 +7,7 @@ namespace AgentTape.Core.Storage;
 /// </summary>
 public static partial class SessionIdFactory
 {
-    private const int MaxLength = 80;
+    private const int MaxLength = 120;
     private const string FallbackName = "session";
 
     /// <summary>

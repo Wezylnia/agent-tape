@@ -42,6 +42,7 @@ public sealed class FileSystemSessionStore : ISessionStore
             StdoutDirectory = Path.Combine(sessionDir, "stdout"),
             StderrDirectory = Path.Combine(sessionDir, "stderr"),
             GitDirectory = Path.Combine(sessionDir, "git"),
+            TestsDirectory = Path.Combine(sessionDir, "tests"),
             ReportsDirectory = Path.Combine(root, "reports")
         };
 
@@ -49,6 +50,7 @@ public sealed class FileSystemSessionStore : ISessionStore
         Directory.CreateDirectory(paths.StdoutDirectory);
         Directory.CreateDirectory(paths.StderrDirectory);
         Directory.CreateDirectory(paths.GitDirectory);
+        Directory.CreateDirectory(paths.TestsDirectory);
         Directory.CreateDirectory(paths.ReportsDirectory);
 
         return Task.FromResult(paths);
