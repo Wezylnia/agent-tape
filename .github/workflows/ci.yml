@@ -34,3 +34,6 @@ jobs:
 
       - name: Test
         run: dotnet test AgentTape.slnx --no-build
+
+      - name: Pack
+        run: dotnet pack -c Release --no-build
