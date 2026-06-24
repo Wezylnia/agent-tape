@@ -1,3 +1,4 @@
+using AgentTape.Core;
 using AgentTape.Core.Abstractions;
 using AgentTape.Core.Configuration;
 using AgentTape.Core.Models;
@@ -133,6 +134,9 @@ public sealed class RecordCommand
         var (preExistingChanges, sessionChanges) = ComputeFileChangeDelta(beforeGit.Changes, afterGit.Changes);
         var hasDirtyBefore = beforeGit.IsRepository && beforeGit.Changes.Count > 0;
 
+        // Capture environment snapshot
+        var environmentSnapshot = await EnvironmentSnapshotCapture.CaptureAsync(cancellationToken);
+
         var session = new TapeSession
         {
             Id = sessionId,
@@ -143,6 +147,7 @@ public sealed class RecordCommand
             RedactionMode = redactionMode,
             BeforeGit = beforeGit,
             AfterGit = afterGit with { StatusText = redactedDiff },
+            Environment = environmentSnapshot,
             Commands = [command],
             FileChanges = afterGit.Changes,
             PreExistingChanges = preExistingChanges,
