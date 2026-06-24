@@ -11,6 +11,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/AgentTape.Cli.Tests/AgentTape.Cli.Tests.csproj" />
     <Project Path="tests/AgentTape.Core.Tests/AgentTape.Core.Tests.csproj" />
+    <Project Path="tests/AgentTape.Git.Tests/AgentTape.Git.Tests.csproj" />
     <Project Path="tests/AgentTape.Redaction.Tests/AgentTape.Redaction.Tests.csproj" />
     <Project Path="tests/AgentTape.Reporting.Tests/AgentTape.Reporting.Tests.csproj" />
   </Folder>

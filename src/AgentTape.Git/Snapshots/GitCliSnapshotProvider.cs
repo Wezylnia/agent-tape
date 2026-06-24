@@ -43,30 +43,75 @@ public sealed class GitCliSnapshotProvider : IGitSnapshotProvider
         return result.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static IReadOnlyList<FileChange> ParsePorcelainStatus(string status)
+    internal static IReadOnlyList<FileChange> ParsePorcelainStatus(string status)
     {
         var changes = new List<FileChange>();
-        foreach (var line in status.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        // Do NOT trim entries - leading space is significant in porcelain v1 format
+        foreach (var line in status.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (line.Length < 4)
+            var trimmedLine = line.TrimEnd('\r', '\n');
+            if (trimmedLine.Length < 3)
             {
                 continue;
             }
 
-            var code = line[..2];
-            var path = line[3..];
+            var indexCode = line[0];
+            var workTreeCode = line[1];
+            var rest = line[3..];
+
+            // Handle renamed/copied: "R  old -> new"
+            string? oldPath = null;
+            string path;
+            var arrowIndex = rest.IndexOf(" -> ", StringComparison.Ordinal);
+            if (arrowIndex >= 0)
+            {
+                oldPath = rest[..arrowIndex].Trim();
+                path = rest[(arrowIndex + 4)..].Trim();
+            }
+            else
+            {
+                path = rest.Trim();
+                // Remove surrounding quotes if present
+                if (path.StartsWith('"') && path.EndsWith('"'))
+                {
+                    path = path[1..^1];
+                }
+            }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                continue;
+            }
+
+            var kind = ClassifyStatus(indexCode, workTreeCode);
+
             changes.Add(new FileChange
             {
                 Path = path,
-                Kind = code.Contains('A') ? FileChangeKind.Added :
-                    code.Contains('D') ? FileChangeKind.Deleted :
-                    code.Contains('R') ? FileChangeKind.Renamed :
-                    code.Contains('M') ? FileChangeKind.Modified :
-                    FileChangeKind.Unknown
+                OldPath = oldPath,
+                Kind = kind
             });
         }
 
         return changes;
+    }
+
+    private static FileChangeKind ClassifyStatus(char indexCode, char workTreeCode)
+    {
+        // Check index (staging area) first, then worktree
+        var primary = indexCode != ' ' && indexCode != '?' && indexCode != '!' ? indexCode : workTreeCode;
+
+        return primary switch
+        {
+            'A' => FileChangeKind.Added,
+            'M' => FileChangeKind.Modified,
+            'D' => FileChangeKind.Deleted,
+            'R' => FileChangeKind.Renamed,
+            'C' => FileChangeKind.Copied,
+            'U' => FileChangeKind.Unmerged,
+            'T' => FileChangeKind.TypeChanged,
+            _ => FileChangeKind.Unknown
+        };
     }
 
     private static async Task<string> RunGitAsync(
