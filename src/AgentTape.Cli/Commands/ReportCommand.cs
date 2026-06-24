@@ -7,40 +7,77 @@ using AgentTape.Cli.Parsing;
 namespace AgentTape.Cli.Commands;
 
 /// <summary>
-/// Handles the report command: displays path to the latest generated report.
+/// Handles the report command: displays path to the latest or specified session report.
 /// </summary>
 public static class ReportCommand
 {
-    public static Task<int> ExecuteAsync(CliParseResult parseResult, CancellationToken cancellationToken)
+    public static async Task<int> ExecuteAsync(CliParseResult parseResult, CancellationToken cancellationToken)
     {
         var options = new AgentTapeOptions();
-        var reportsDir = Path.Combine(options.AgentTapeDirectory, "reports");
+        var globalReportsDir = Path.Combine(options.AgentTapeDirectory, "reports");
 
-        if (!Directory.Exists(reportsDir))
+        string? htmlPath;
+        string? markdownPath;
+
+        if (!string.IsNullOrEmpty(parseResult.SessionId))
         {
-            Console.Error.WriteLine("No reports found. Run: agenttape record -- <command>");
-            return Task.FromResult(CommandExitCodes.Success);
+            var sessionReportsDir = Path.Combine(options.AgentTapeDirectory, "sessions", parseResult.SessionId, "reports");
+            if (!Directory.Exists(sessionReportsDir))
+            {
+                Console.Error.WriteLine($"Session not found: {parseResult.SessionId}");
+                return CommandExitCodes.UsageError;
+            }
+            htmlPath = Path.Combine(sessionReportsDir, "session.html");
+            markdownPath = Path.Combine(sessionReportsDir, "session.md");
+        }
+        else
+        {
+            htmlPath = Path.Combine(globalReportsDir, "latest.html");
+            markdownPath = Path.Combine(globalReportsDir, "latest.md");
         }
 
-        var htmlPath = Path.Combine(reportsDir, "session.html");
-        var markdownPath = Path.Combine(reportsDir, "session.md");
+        // Handle --open
+        if (parseResult.Open)
+        {
+            if (parseResult.Markdown && !parseResult.Html)
+            {
+                Console.Error.WriteLine("Opening HTML report. Markdown reports cannot be opened as interactive reports.");
+            }
 
+            if (!File.Exists(htmlPath))
+            {
+                Console.Error.WriteLine("No HTML report found. Run: agenttape record -- <command>");
+                return CommandExitCodes.UsageError;
+            }
+
+            var opener = new SystemReportOpener();
+            await opener.OpenAsync(htmlPath, cancellationToken);
+            Console.WriteLine($"Opened: {Path.GetFullPath(htmlPath)}");
+            return CommandExitCodes.Success;
+        }
+
+        PrintReportPaths(htmlPath, markdownPath, parseResult.Html, parseResult.Markdown);
+        return CommandExitCodes.Success;
+    }
+
+    private static void PrintReportPaths(string? htmlPath, string? markdownPath, bool preferHtml, bool preferMarkdown)
+    {
         var found = false;
 
-        if (parseResult.Html || (!parseResult.Html && !parseResult.Markdown))
+        if (preferHtml || (!preferHtml && !preferMarkdown))
         {
-            if (File.Exists(htmlPath))
+            if (htmlPath is not null && File.Exists(htmlPath))
             {
-                Console.WriteLine($"Latest HTML report: {Path.GetFullPath(htmlPath)}");
+                Console.WriteLine($"HTML report: {Path.GetFullPath(htmlPath)}");
                 found = true;
             }
         }
 
-        if (parseResult.Markdown || (!parseResult.Html && !parseResult.Markdown))
+        if (preferMarkdown || (!preferHtml && !preferMarkdown))
         {
-            if (File.Exists(markdownPath))
+            if (markdownPath is not null && File.Exists(markdownPath))
             {
-                Console.WriteLine($"Latest Markdown report: {Path.GetFullPath(markdownPath)}");
+                Console.WriteLine($"Markdown report: {Path.GetFullPath(markdownPath)}");
                 found = true;
             }
         }
@@ -49,7 +86,5 @@ public static class ReportCommand
         {
             Console.Error.WriteLine("No reports found. Run: agenttape record -- <command>");
         }
-
-        return Task.FromResult(CommandExitCodes.Success);
     }
 }

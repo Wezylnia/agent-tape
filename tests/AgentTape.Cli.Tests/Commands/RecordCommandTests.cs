@@ -183,6 +183,17 @@ public sealed class RecordCommandTests
             RedactCallCount++;
             return $"[REDACTED] {input}";
         }
+
+        public RedactionResult RedactWithSummary(string input, RedactionMode mode)
+        {
+            RedactCallCount++;
+            return new RedactionResult
+            {
+                Text = $"[REDACTED] {input}",
+                MatchCount = 1,
+                Summaries = [new RedactionMatchSummary { RuleName = "Test Rule", Count = 1 }]
+            };
+        }
     }
 
     private sealed class FakeSessionStore : ISessionStore
@@ -192,6 +203,7 @@ public sealed class RecordCommandTests
         public Task<SessionPaths> CreateSessionLayoutAsync(TapeSession session, CancellationToken cancellationToken)
         {
             var tmp = Path.Combine(Path.GetTempPath(), "agenttape-fake", session.Id);
+            var globalReports = Path.Combine(Path.GetTempPath(), "agenttape-fake", "reports");
             var paths = new SessionPaths
             {
                 RootDirectory = tmp,
@@ -201,16 +213,23 @@ public sealed class RecordCommandTests
                 StderrDirectory = Path.Combine(tmp, "stderr"),
                 GitDirectory = Path.Combine(tmp, "git"),
                 TestsDirectory = Path.Combine(tmp, "tests"),
-                ReportsDirectory = Path.Combine(tmp, "reports")
+                SessionReportsDirectory = Path.Combine(tmp, "reports"),
+                GlobalReportsDirectory = globalReports
             };
             Directory.CreateDirectory(tmp);
-            Directory.CreateDirectory(paths.ReportsDirectory);
+            Directory.CreateDirectory(paths.SessionReportsDirectory);
+            Directory.CreateDirectory(paths.GlobalReportsDirectory);
             return Task.FromResult(paths);
         }
 
         public Task SaveSessionAsync(TapeSession session, SessionPaths paths, CancellationToken cancellationToken)
         {
             SaveCalled = true;
+            return Task.CompletedTask;
+        }
+
+        public Task SaveRedactionLogAsync(SessionPaths paths, IReadOnlyList<RedactionMatchSummary> summaries, CancellationToken cancellationToken)
+        {
             return Task.CompletedTask;
         }
     }

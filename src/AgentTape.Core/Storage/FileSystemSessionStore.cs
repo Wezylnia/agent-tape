@@ -33,6 +33,8 @@ public sealed class FileSystemSessionStore : ISessionStore
     {
         var root = _options.AgentTapeDirectory;
         var sessionDir = Path.Combine(root, "sessions", session.Id);
+        var sessionReportsDir = Path.Combine(sessionDir, "reports");
+        var globalReportsDir = Path.Combine(root, "reports");
 
         var paths = new SessionPaths
         {
@@ -43,7 +45,8 @@ public sealed class FileSystemSessionStore : ISessionStore
             StderrDirectory = Path.Combine(sessionDir, "stderr"),
             GitDirectory = Path.Combine(sessionDir, "git"),
             TestsDirectory = Path.Combine(sessionDir, "tests"),
-            ReportsDirectory = Path.Combine(root, "reports")
+            SessionReportsDirectory = sessionReportsDir,
+            GlobalReportsDirectory = globalReportsDir
         };
 
         Directory.CreateDirectory(sessionDir);
@@ -51,7 +54,8 @@ public sealed class FileSystemSessionStore : ISessionStore
         Directory.CreateDirectory(paths.StderrDirectory);
         Directory.CreateDirectory(paths.GitDirectory);
         Directory.CreateDirectory(paths.TestsDirectory);
-        Directory.CreateDirectory(paths.ReportsDirectory);
+        Directory.CreateDirectory(paths.SessionReportsDirectory);
+        Directory.CreateDirectory(paths.GlobalReportsDirectory);
 
         return Task.FromResult(paths);
     }
@@ -98,10 +102,18 @@ public sealed class FileSystemSessionStore : ISessionStore
             await File.WriteAllTextAsync(diffPath, session.AfterGit.StatusText, cancellationToken);
         }
 
-        // Write redaction log placeholder
+        // Write redaction log (placeholder - will be filled by SaveRedactionLogAsync)
         var redactionLogPath = Path.Combine(Path.GetDirectoryName(paths.SessionJsonPath)!, "redaction-log.json");
         EnsureWithinRoot(paths.RootDirectory, redactionLogPath);
         await File.WriteAllTextAsync(redactionLogPath, "[]", cancellationToken);
+    }
+
+    public async Task SaveRedactionLogAsync(SessionPaths paths, IReadOnlyList<RedactionMatchSummary> summaries, CancellationToken cancellationToken)
+    {
+        var redactionLogPath = Path.Combine(Path.GetDirectoryName(paths.SessionJsonPath)!, "redaction-log.json");
+        EnsureWithinRoot(paths.RootDirectory, redactionLogPath);
+        var json = JsonSerializer.Serialize(summaries, JsonOptions);
+        await File.WriteAllTextAsync(redactionLogPath, json, cancellationToken);
     }
 
     public static string GetStdoutPath(SessionPaths paths, int index)

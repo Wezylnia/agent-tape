@@ -51,8 +51,8 @@ public sealed class RecordCommandIntegrationTests : IDisposable
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
         Assert.Equal(0, exitCode);
-        Assert.True(File.Exists(Path.Combine(_tempDir, ".agenttape", "reports", "session.md")));
-        Assert.True(File.Exists(Path.Combine(_tempDir, ".agenttape", "reports", "session.html")));
+        Assert.True(File.Exists(Path.Combine(_tempDir, ".agenttape", "reports", "latest.md")));
+        Assert.True(File.Exists(Path.Combine(_tempDir, ".agenttape", "reports", "latest.html")));
 
         // Verify session.json exists in the sessions directory
         var sessionsDir = Path.Combine(_tempDir, ".agenttape", "sessions");
@@ -88,7 +88,7 @@ public sealed class RecordCommandIntegrationTests : IDisposable
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
         Assert.Equal(0, exitCode);
-        var reportPath = Path.Combine(_tempDir, ".agenttape", "reports", "session.md");
+        var reportPath = Path.Combine(_tempDir, ".agenttape", "reports", "latest.md");
         Assert.True(File.Exists(reportPath));
 
         var reportContent = await File.ReadAllTextAsync(reportPath);
@@ -142,14 +142,14 @@ public sealed class RecordCommandIntegrationTests : IDisposable
         var exitCode = await cmd.ExecuteAsync(parseResult, CancellationToken.None);
 
         // Verify reports don't contain the raw secret
-        var reportPath = Path.Combine(_tempDir, ".agenttape", "reports", "session.md");
+        var reportPath = Path.Combine(_tempDir, ".agenttape", "reports", "latest.md");
         if (File.Exists(reportPath))
         {
             var content = await File.ReadAllTextAsync(reportPath);
             Assert.DoesNotContain("ghp_abc123", content);
         }
 
-        var htmlPath = Path.Combine(_tempDir, ".agenttape", "reports", "session.html");
+        var htmlPath = Path.Combine(_tempDir, ".agenttape", "reports", "latest.html");
         if (File.Exists(htmlPath))
         {
             var content = await File.ReadAllTextAsync(htmlPath);
