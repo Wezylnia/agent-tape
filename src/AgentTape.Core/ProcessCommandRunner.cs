@@ -119,9 +119,16 @@ public sealed class ProcessCommandRunner(IClock clock) : ICommandRunner
     {
         var buffer = new char[4096];
         int charsRead;
-        while ((charsRead = await reader.ReadAsync(buffer, cancellationToken)) > 0)
+        try
         {
-            builder.Append(buffer, 0, charsRead);
+            while ((charsRead = await reader.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                builder.Append(buffer, 0, charsRead);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Process was killed; stream read cancellation is expected.
         }
     }
 

@@ -34,7 +34,7 @@ public sealed class FileSystemSessionStoreTests : IDisposable
         Assert.True(Directory.Exists(paths.StdoutDirectory));
         Assert.True(Directory.Exists(paths.StderrDirectory));
         Assert.True(Directory.Exists(paths.GitDirectory));
-        Assert.True(Directory.Exists(paths.ReportsDirectory));
+        Assert.True(Directory.Exists(paths.SessionReportsDirectory));
     }
 
     [Fact]
