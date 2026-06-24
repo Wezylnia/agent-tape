@@ -1,0 +1,18 @@
+name: Documentation
+description: Improve public docs, examples, or contributor guidance.
+title: "[Docs]: "
+labels: ["documentation", "type:docs", "needs-triage"]
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Page or topic
+      description: Which document should change?
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: Suggested change
+    validations:
+      required: true

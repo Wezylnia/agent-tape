@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgentTape.Cli/AgentTape.Cli.csproj" />
+    <Project Path="src/AgentTape.Core/AgentTape.Core.csproj" />
+    <Project Path="src/AgentTape.Git/AgentTape.Git.csproj" />
+    <Project Path="src/AgentTape.Redaction/AgentTape.Redaction.csproj" />
+    <Project Path="src/AgentTape.Reporting/AgentTape.Reporting.csproj" />
+    <Project Path="src/AgentTape.Rules/AgentTape.Rules.csproj" />
+    <Project Path="src/AgentTape.Testing/AgentTape.Testing.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AgentTape.Core.Tests/AgentTape.Core.Tests.csproj" />
+    <Project Path="tests/AgentTape.Redaction.Tests/AgentTape.Redaction.Tests.csproj" />
+    <Project Path="tests/AgentTape.Reporting.Tests/AgentTape.Reporting.Tests.csproj" />
+  </Folder>
+</Solution>

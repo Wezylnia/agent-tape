@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+TestResults/
+.agenttape/
+private-docs/
+*.user
+*.suo
+private-docs/
