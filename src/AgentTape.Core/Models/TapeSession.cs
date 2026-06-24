@@ -26,6 +26,12 @@ public sealed record TapeSession
 
     public IReadOnlyList<FileChange> FileChanges { get; init; } = Array.Empty<FileChange>();
 
+    /// <summary>Changes that existed before recording started.</summary>
+    public IReadOnlyList<FileChange> PreExistingChanges { get; init; } = Array.Empty<FileChange>();
+
+    /// <summary>Changes caused during the session (after minus before).</summary>
+    public IReadOnlyList<FileChange> SessionChanges { get; init; } = Array.Empty<FileChange>();
+
     public IReadOnlyList<TestSummary> TestSummaries { get; init; } = Array.Empty<TestSummary>();
 
     public IReadOnlyList<RiskWarning> Warnings { get; init; } = Array.Empty<RiskWarning>();

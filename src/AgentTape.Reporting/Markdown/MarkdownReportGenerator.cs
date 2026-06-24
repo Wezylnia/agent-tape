@@ -60,15 +60,47 @@ public sealed class MarkdownReportGenerator : IReportGenerator
         // Changed files
         builder.AppendLine("## Changed Files");
         builder.AppendLine();
-        if (session.FileChanges.Count == 0)
+
+        // Pre-existing changes
+        if (session.PreExistingChanges.Count > 0)
+        {
+            builder.AppendLine("### Pre-existing Changes");
+            builder.AppendLine();
+            builder.AppendLine("_These files were already modified before recording started._");
+            builder.AppendLine();
+            builder.AppendLine("| Kind | Path |");
+            builder.AppendLine("|---|---|");
+            foreach (var change in session.PreExistingChanges)
+            {
+                var path = change.OldPath is not null
+                    ? $"{Escape(change.OldPath)} → {Escape(change.Path)}"
+                    : Escape(change.Path);
+                builder.AppendLine($"| {change.Kind} | `{path}` |");
+            }
+            builder.AppendLine();
+        }
+
+        // Session changes
+        // Session changes (or fall back to FileChanges for backward compat)
+        var sessionChanges = session.SessionChanges.Count > 0 || session.PreExistingChanges.Count > 0
+            ? session.SessionChanges
+            : session.FileChanges;
+
+        builder.AppendLine("### Session Changes");
+        builder.AppendLine();
+        if (sessionChanges.Count == 0 && session.PreExistingChanges.Count == 0 && session.FileChanges.Count == 0)
         {
             builder.AppendLine("_No changed files captured._");
+        }
+        else if (sessionChanges.Count == 0)
+        {
+            builder.AppendLine("_No new session changes detected._");
         }
         else
         {
             builder.AppendLine("| Kind | Path |");
             builder.AppendLine("|---|---|");
-            foreach (var change in session.FileChanges)
+            foreach (var change in sessionChanges)
             {
                 var path = change.OldPath is not null
                     ? $"{Escape(change.OldPath)} → {Escape(change.Path)}"

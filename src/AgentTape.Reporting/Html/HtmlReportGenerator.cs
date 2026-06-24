@@ -76,14 +76,41 @@ public sealed class HtmlReportGenerator : IReportGenerator
 
         // Changed files
         html.AppendLine("<h2>Changed Files</h2>");
-        if (session.FileChanges.Count == 0)
+
+        // Pre-existing changes
+        if (session.PreExistingChanges.Count > 0)
+        {
+            html.AppendLine("<h3>Pre-existing Changes</h3>");
+            html.AppendLine("<p><em>These files were already modified before recording started.</em></p>");
+            html.AppendLine("<table><tr><th>Kind</th><th>Path</th></tr>");
+            foreach (var change in session.PreExistingChanges)
+            {
+                var path = change.OldPath is not null
+                    ? $"{Encode(change.OldPath)} → {Encode(change.Path)}"
+                    : Encode(change.Path);
+                html.AppendLine($"<tr><td>{change.Kind}</td><td><code>{path}</code></td></tr>");
+            }
+            html.AppendLine("</table>");
+        }
+
+        // Session changes (or fall back to FileChanges for backward compat)
+        var sessionChanges = session.SessionChanges.Count > 0 || session.PreExistingChanges.Count > 0
+            ? session.SessionChanges
+            : session.FileChanges;
+
+        html.AppendLine("<h3>Session Changes</h3>");
+        if (sessionChanges.Count == 0 && session.PreExistingChanges.Count == 0 && session.FileChanges.Count == 0)
         {
             html.AppendLine("<p><em>No changed files captured.</em></p>");
+        }
+        else if (sessionChanges.Count == 0)
+        {
+            html.AppendLine("<p><em>No new session changes detected.</em></p>");
         }
         else
         {
             html.AppendLine("<table><tr><th>Kind</th><th>Path</th></tr>");
-            foreach (var change in session.FileChanges)
+            foreach (var change in sessionChanges)
             {
                 var path = change.OldPath is not null
                     ? $"{Encode(change.OldPath)} → {Encode(change.Path)}"

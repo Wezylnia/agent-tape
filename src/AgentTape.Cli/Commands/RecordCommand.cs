@@ -123,6 +123,10 @@ public sealed class RecordCommand
         var redactedDiff = _redactor.Redact(diff, redactionMode);
         var redactedWorkingDirectory = _redactor.Redact(workingDirectory, redactionMode);
 
+        // Compute session delta: separate pre-existing changes from session changes
+        var (preExistingChanges, sessionChanges) = ComputeFileChangeDelta(beforeGit.Changes, afterGit.Changes);
+        var hasDirtyBefore = beforeGit.IsRepository && beforeGit.Changes.Count > 0;
+
         var session = new TapeSession
         {
             Id = sessionId,
@@ -135,10 +139,24 @@ public sealed class RecordCommand
             AfterGit = afterGit with { StatusText = redactedDiff },
             Commands = [command],
             FileChanges = afterGit.Changes,
+            PreExistingChanges = preExistingChanges,
+            SessionChanges = sessionChanges,
             TestSummaries = [_testDetector.Detect(command.Command, result.Stdout, result.Stderr)]
         };
 
         session = session with { Warnings = _riskRule.Evaluate(session) };
+
+        // Add dirty-before warning if repository had uncommitted changes before recording
+        if (hasDirtyBefore)
+        {
+            var dirtyWarning = new RiskWarning
+            {
+                Code = "DIRTY_REPOSITORY_BEFORE_RECORDING",
+                Severity = RiskSeverity.Warning,
+                Message = "Repository had uncommitted changes before recording. Some final changes may not belong to this session."
+            };
+            session = session with { Warnings = session.Warnings.Append(dirtyWarning).ToArray() };
+        }
 
         // Build redaction summaries
         var stdoutResult = _redactor.RedactWithSummary(result.Stdout, redactionMode);
@@ -180,6 +198,36 @@ public sealed class RecordCommand
             "strict" => RedactionMode.Strict,
             _ => RedactionMode.Standard
         };
+    }
+
+    private static (IReadOnlyList<FileChange> PreExisting, IReadOnlyList<FileChange> Session) ComputeFileChangeDelta(
+        IReadOnlyList<FileChange> before, IReadOnlyList<FileChange> after)
+    {
+        if (before.Count == 0)
+        {
+            return (Array.Empty<FileChange>(), after);
+        }
+
+        var beforePaths = before.Select(f => f.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var afterPaths = after.Select(f => f.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var preExisting = before.ToArray();
+
+        // Session changes are files that appear only in after, or were in both but changed
+        var session = after
+            .Where(f => !beforePaths.Contains(f.Path) || beforePaths.Contains(f.Path))
+            .ToArray();
+
+        // For files in both, mark as pre-existing modified
+        var overlapping = after.Where(f => beforePaths.Contains(f.Path)).ToList();
+        var newOnly = after.Where(f => !beforePaths.Contains(f.Path)).ToList();
+
+        // Simple v1.0 approach: new files in after = session changes
+        // Files present in both = ambiguous, mark as pre-existing
+        var sessionChanges = newOnly;
+        var preExistingChanges = preExisting.Concat(overlapping).ToList();
+
+        return (preExistingChanges, sessionChanges);
     }
 
     private static IReadOnlyList<RedactionMatchSummary> MergeSummaries(params RedactionResult[] results)
