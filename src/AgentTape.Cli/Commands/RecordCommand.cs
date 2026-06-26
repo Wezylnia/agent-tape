@@ -156,7 +156,7 @@ public sealed class RecordCommand
             FileChanges = afterGit.Changes,
             PreExistingChanges = preExistingChanges,
             SessionChanges = sessionChanges,
-            TestSummaries = BuildTestSummaries(command.Command, result.Stdout, result.Stderr, workingDirectory)
+            TestSummaries = BuildTestSummaries(command.Command, result.Stdout, result.Stderr, workingDirectory, startedAt)
         };
 
         session = session with { Warnings = _riskRule.Evaluate(session) };
@@ -270,7 +270,12 @@ public sealed class RecordCommand
         }).ToArray();
     }
 
-    private IReadOnlyList<TestSummary> BuildTestSummaries(string command, string stdout, string stderr, string workingDirectory)
+    private IReadOnlyList<TestSummary> BuildTestSummaries(
+        string command,
+        string stdout,
+        string stderr,
+        string workingDirectory,
+        DateTimeOffset sessionStartedAt)
     {
         var summaries = new List<TestSummary>();
 
@@ -284,7 +289,7 @@ public sealed class RecordCommand
         // TRX file detection
         try
         {
-            var trxSummary = ScanTrxFiles(workingDirectory);
+            var trxSummary = ScanTrxFiles(workingDirectory, sessionStartedAt);
             if (trxSummary.HasAnySignal)
             {
                 summaries.Add(trxSummary);
@@ -298,13 +303,13 @@ public sealed class RecordCommand
         return summaries;
     }
 
-    private static TestSummary ScanTrxFiles(string workingDirectory)
+    private static TestSummary ScanTrxFiles(string workingDirectory, DateTimeOffset sessionStartedAt)
     {
         // Scan under working directory for .trx files, limited depth
         var trxFiles = new List<string>();
         try
         {
-            ScanForTrx(workingDirectory, trxFiles, depth: 0, maxDepth: 5, maxFiles: 10);
+            ScanForTrx(workingDirectory, trxFiles, sessionStartedAt.UtcDateTime, depth: 0, maxDepth: 5, maxFiles: 10);
         }
         catch
         {
@@ -332,7 +337,13 @@ public sealed class RecordCommand
         return aggregated;
     }
 
-    private static void ScanForTrx(string directory, List<string> results, int depth, int maxDepth, int maxFiles)
+    private static void ScanForTrx(
+        string directory,
+        List<string> results,
+        DateTime sessionStartedAtUtc,
+        int depth,
+        int maxDepth,
+        int maxFiles)
     {
         if (depth > maxDepth || results.Count >= maxFiles)
             return;
@@ -343,6 +354,10 @@ public sealed class RecordCommand
             {
                 if (results.Count >= maxFiles)
                     return;
+
+                if (File.GetLastWriteTimeUtc(file) < sessionStartedAtUtc)
+                    continue;
+
                 results.Add(file);
             }
 
@@ -353,7 +368,7 @@ public sealed class RecordCommand
                 if (dirName is "bin" or "obj" or "node_modules" or ".git" or ".agenttape")
                     continue;
 
-                ScanForTrx(subDir, results, depth + 1, maxDepth, maxFiles);
+                ScanForTrx(subDir, results, sessionStartedAtUtc, depth + 1, maxDepth, maxFiles);
             }
         }
         catch

@@ -5,7 +5,7 @@ obj/
 .vscode/
 TestResults/
 .agenttape/
+tmp/
 private-docs/
 *.user
 *.suo
-private-docs/

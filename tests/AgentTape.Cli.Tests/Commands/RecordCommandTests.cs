@@ -56,6 +56,41 @@ public sealed class RecordCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ignores_trx_files_from_before_session_start()
+    {
+        var workingDirectory = Path.Combine(Path.GetTempPath(), $"agenttape-stale-trx-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workingDirectory);
+        try
+        {
+            var testResults = Path.Combine(workingDirectory, "TestResults");
+            Directory.CreateDirectory(testResults);
+            var staleTrx = Path.Combine(testResults, "stale.trx");
+            await File.WriteAllTextAsync(staleTrx, """
+                <?xml version="1.0" encoding="utf-8"?>
+                <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+                  <ResultSummary outcome="Completed">
+                    <Counters total="3" executed="3" passed="3" failed="0" />
+                  </ResultSummary>
+                </TestRun>
+                """);
+            File.SetLastWriteTimeUtc(staleTrx, DateTime.UtcNow.AddHours(-1));
+
+            var sessionStore = new FakeSessionStore();
+            var cmd = CreateRecordCommand(sessionStore: sessionStore, workingDirectory: workingDirectory);
+
+            await cmd.ExecuteAsync(CreateParseResult("dotnet"), CancellationToken.None);
+
+            Assert.NotNull(sessionStore.SavedSession);
+            Assert.Empty(sessionStore.SavedSession.TestSummaries);
+        }
+        finally
+        {
+            if (Directory.Exists(workingDirectory))
+                Directory.Delete(workingDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_runs_risk_rules()
     {
         var riskRule = new FakeRiskRule();
@@ -101,7 +136,8 @@ public sealed class RecordCommandTests
         ISessionStore? sessionStore = null,
         ITestResultDetector? testDetector = null,
         IRiskRule? riskRule = null,
-        int commandExitCode = 0)
+        int commandExitCode = 0,
+        string? workingDirectory = null)
     {
         var clock = new FakeClock();
         return new RecordCommand(
@@ -114,7 +150,8 @@ public sealed class RecordCommandTests
             new FakeReportGenerator("html"),
             testDetector ?? new FakeTestResultDetector(),
             riskRule ?? new FakeRiskRule(),
-            new AgentTapeOptions { AgentTapeDirectory = Path.Combine(Path.GetTempPath(), $"agenttape-test-{Guid.NewGuid():N}") });
+            new AgentTapeOptions { AgentTapeDirectory = Path.Combine(Path.GetTempPath(), $"agenttape-test-{Guid.NewGuid():N}") },
+            workingDirectory is null ? null : () => workingDirectory);
     }
 
     // --- Fake implementations ---
@@ -205,6 +242,7 @@ public sealed class RecordCommandTests
     private sealed class FakeSessionStore : ISessionStore
     {
         public bool SaveCalled { get; private set; }
+        public TapeSession? SavedSession { get; private set; }
 
         public Task<SessionPaths> CreateSessionLayoutAsync(TapeSession session, CancellationToken cancellationToken)
         {
@@ -231,6 +269,7 @@ public sealed class RecordCommandTests
         public Task SaveSessionAsync(TapeSession session, SessionPaths paths, CancellationToken cancellationToken)
         {
             SaveCalled = true;
+            SavedSession = session;
             return Task.CompletedTask;
         }
 
